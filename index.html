@@ -312,6 +312,12 @@
     for (let i = 0; i <= n; i++) { g.fillRect(i * s - 1.5, 0, 3, h); g.fillRect(0, i * s - 1.5, w, 3); }
   }, 3);
   const T_concrete = tex(256, 256, (g, w, h, r) => { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); speckle(g, w, h, r, 5000, ['rgba(0,0,0,.07)', 'rgba(0,0,0,.035)', 'rgba(255,255,255,.4)'], [1, 3]); }, 4);
+  // Baldosa de tapia: concreto con la junta arriba; se repite una vez por metro a lo largo y una vez por baldosa (0.50 m) a lo alto
+  const T_slab = tex(256, 128, (g, w, h, r) => {
+    g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, r, 2500, ['rgba(0,0,0,.07)', 'rgba(0,0,0,.035)', 'rgba(255,255,255,.4)'], [1, 3]);
+    g.fillStyle = 'rgba(40,35,30,.4)'; g.fillRect(0, 0, w, 2);
+  }, 11);
   const T_gravel = tex(256, 256, (g, w, h, r) => {
     g.fillStyle = '#6f6a64'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 2600; i++) { const v = 95 + (r() * 120 | 0); g.fillStyle = `rgb(${v},${v - 3},${v - 7})`; g.beginPath(); g.ellipse(r() * w, r() * h, 1 + r() * 2.6, 1 + r() * 2, r() * 3, 0, 6.3); g.fill(); }
@@ -524,9 +530,11 @@
   // Puertas (cargadores 1.08 m ×2 y 1.03 m ×3). Hojas de 0.86 y 0.81 m dentro de un marco de 5 cm
   doorFrame('x', 6.0, 3.06, 4.02); doorLeaf(3.11, 6.0, 0.86, 0);
   doorFrame('x', 0, 3.06, 4.02); doorLeaf(3.11, 0, 0.86, 0);
-  doorFrame('x', 2.5, 2.03, 2.94); doorLeaf(2.89, 2.5, 0.81, Math.PI - 1.45);
-  doorFrame('x', 4.0, 2.03, 2.94); doorLeaf(2.89, 4.0, 0.81, Math.PI + 1.45);
-  doorFrame('y', BX, 3.03, 3.94); doorLeaf(BX, 3.08, 0.81, -Math.PI / 2 - 1.45);
+  // Las del baño y los dormitorios abren hacia afuera, al pasillo. Para que no choquen: la del dormitorio 1 queda contra la pared del baño,
+  // la del dormitorio 2 contra la pared de la sala y la del baño a 45°, sin tapar la entrada al dormitorio 2
+  doorFrame('x', 2.5, 2.03, 2.94); doorLeaf(2.08, 2.5, 0.81, -1.45);
+  doorFrame('x', 4.0, 2.03, 2.94); doorLeaf(2.89, 4.0, 0.81, Math.PI - 1.45);
+  doorFrame('y', BX, 3.03, 3.94); doorLeaf(BX, 3.89, 0.81, Math.PI / 4);
 
   // Contrapiso y corredor
   const plinthMats = [M.ext, M.ext, M.floorBase, M.ext, M.ext, M.ext];   // el rodapié va pintado como la fachada (fotos de atrás)
@@ -817,10 +825,15 @@
   // Largo, fondo y altura (NB) son supuestos: van a la par de la casa
   const NB = { len: 9, depth: 6, h: 2.6 };
   const nbWall = std({ color: 0xDAD5CB, map: T_plaster, roughness: .95 });
-  [[1, 2], [3, 0]].forEach(([i, j]) => {
+  // Colindancia de LOT[i] a LOT[j]: dirección u, largo L, distancia t del vértice i al pie f (a la par de la casa) y normal n hacia afuera
+  const sideLine = (i, j) => {
     const a = LOT[i], b = LOT[j], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
     const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], t = -(a[0] * u[0] + a[1] * u[1]);
-    const f = [a[0] + u[0] * t, a[1] + u[1] * t], fl = Math.hypot(f[0], f[1]), n = [f[0] / fl, f[1] / fl]; // pie y normal hacia afuera
+    const f = [a[0] + u[0] * t, a[1] + u[1] * t], fl = Math.hypot(f[0], f[1]);
+    return { a, u, L, t, f, n: [f[0] / fl, f[1] / fl] };
+  };
+  [[1, 2], [3, 0]].forEach(([i, j]) => {
+    const { u, f, n } = sideLine(i, j);
     const g = new THREE.Group(); neighbors.add(g);
     g.position.set(f[0] + n[0] * (NB.depth / 2 + 0.03), 0, f[1] + n[1] * (NB.depth / 2 + 0.03));
     g.rotation.y = Math.atan2(-u[1], u[0]);                   // x local a lo largo de la colindancia
@@ -830,6 +843,26 @@
     scaleUV(nbRoof.geometry, (NB.len + 0.4) / 0.19, 1);
     nbRoof.rotation.x = side * Math.atan(0.4 / NB.depth);      // una sola agua, alta del lado del lote
   });
+
+  // Tapia prefabricada en la colindancia 2-3 (vecino de la izquierda visto desde la calle), solo donde no está la casa vecina:
+  // de la calle hasta la casa vecina y de ahí hasta el fondo. La cara hacia el lote queda al ras de la casa vecina.
+  // Alto, separación de columnas y color son supuestos (TAPIA)
+  const TAPIA = { h: 2.0, span: 1.5, col: 0.12, slab: 0.05 };
+  const tapiaSlab = std({ color: 0xBDB9B1, map: T_slab, roughness: .95 });
+  const tapiaCol = std({ color: 0xC4C0B8, map: T_concrete, roughness: .95 });
+  {
+    const { a, u, L, t, n } = sideLine(1, 2), off = 0.03 + TAPIA.col / 2, g = new THREE.Group(); site.add(g);
+    g.position.set(a[0] + n[0] * off, 0, a[1] + n[1] * off);   // x local = metros desde el vértice 2, sobre la colindancia
+    g.rotation.y = Math.atan2(-u[1], u[0]);
+    [[0, t - NB.len / 2], [t + NB.len / 2, L]].forEach(([s0, s1]) => {
+      const k = Math.ceil((s1 - s0 - TAPIA.col) / TAPIA.span), step = (s1 - s0 - TAPIA.col) / k, len = step - TAPIA.col;
+      for (let c = 0; c <= k; c++) addBox(TAPIA.col, TAPIA.h + 0.05, TAPIA.col, tapiaCol, s0 + TAPIA.col / 2 + c * step, (TAPIA.h + 0.05) / 2, 0, g);
+      for (let c = 0; c < k; c++) {
+        const slab = addBox(len, TAPIA.h, TAPIA.slab, tapiaSlab, s0 + TAPIA.col / 2 + (c + 0.5) * step, TAPIA.h / 2, 0, g);
+        scaleUV(slab.geometry, len, TAPIA.h / 0.5);
+      }
+    });
+  }
 
   const leafMats = [0x4c7a3b, 0x5f8c46, 0x3f6a34, 0x6e9a52].map(c => std({ color: c, roughness: .9, flatShading: true }));
   const bark = std({ color: 0x5b4332, roughness: 1 });
