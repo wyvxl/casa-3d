@@ -805,12 +805,13 @@
     post.position.set(pt[0], 0.175, pt[1]); site.add(seg, post);
   });
 
-  // Calle pública: derecho de vía de 11.08 m frente a la línea 1-2 (plano). La carretera de lastre de 6 m al centro es un supuesto
+  // Calle pública: derecho de vía de 11.08 m frente a la línea 1-2 (plano). La carretera de lastre de 6 m arranca al ras del lote (dueña)
   const c1 = LOT[0], c2 = LOT[1], cl = Math.hypot(c2[0] - c1[0], c2[1] - c1[1]);
   const cu = [(c2[0] - c1[0]) / cl, (c2[1] - c1[1]) / cl], cm = [(c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2];
   let cn = [-cu[1], cu[0]]; if (cn[0] * cm[0] + cn[1] * cm[1] < 0) cn = [-cn[0], -cn[1]];   // hacia afuera del lote
-  const road = flat(scaleUV(new THREE.PlaneGeometry(90, 6), 90 / 1.5, 6 / 1.5), std({ map: T_gravel, color: 0xa8a197, roughness: 1 }), 0.015, 1);
-  road.position.set(cm[0] + cn[0] * 5.54, 0.015, cm[1] + cn[1] * 5.54); road.rotation.y = Math.atan2(-cu[1], cu[0]);
+  const ROAD_W = 6, roadMid = ROAD_W / 2;                                   // del borde del lote hacia afuera
+  const road = flat(scaleUV(new THREE.PlaneGeometry(90, ROAD_W), 90 / 1.5, ROAD_W / 1.5), std({ map: T_gravel, color: 0xa8a197, roughness: 1 }), 0.015, 1);
+  road.position.set(cm[0] + cn[0] * roadMid, 0.015, cm[1] + cn[1] * roadMid); road.rotation.y = Math.atan2(-cu[1], cu[0]);
 
   // Piedrilla al frente (fotos) y pasos de concreto hasta la calle
   const gravel = flat(scaleUV(new THREE.PlaneGeometry(6.9, 1.5), 6.9 / 1.2, 1.5 / 1.2), std({ map: T_gravel, color: 0xc4c1bc, roughness: 1 }), 0.02, 2);
@@ -992,7 +993,7 @@
   dimLine(W + 0.06, D / 2, xRight + W / 2, D / 2, (xRight - X(W + 0.06)).toFixed(2), lotDims);
   $('#lot-gap').innerHTML = `${(xRight - X(W + 0.06)).toFixed(2)}<small>m</small>`;
   lotLabel('dim', 'Lote · 212 m²', new V3(lotMid[0] + 2.3, 0.06, zBack + 1.6));
-  lotLabel('dim', 'Calle pública', new V3(cm[0] + cn[0] * 5.54, 0.06, cm[1] + cn[1] * 5.54));
+  lotLabel('dim', 'Calle pública', new V3(cm[0] + cn[0] * roadMid, 0.06, cm[1] + cn[1] * roadMid));
   // Flecha al norte, en el frente del terreno vecino del este
   const NORTH = azDir(0), arrow = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([[0, 0.9], [0.4, 0], [0.12, 0.1], [0.12, -0.8], [-0.12, -0.8], [-0.12, 0.1], [-0.4, 0]]
     .map(([x, y]) => new THREE.Vector2(x * 1.4, y * 1.4)))), dimMat);
