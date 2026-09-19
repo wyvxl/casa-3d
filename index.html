@@ -140,6 +140,7 @@
   .lbl.room.is-sel small{color:var(--paper);opacity:.8}
   .lbl.room.is-sel .ld{display:inline}
   .lbl.dim.lot-pt{background:#E0241B;color:#fff;border-color:#E0241B;border-radius:999px;min-width:20px;text-align:center}
+  .lbl.dim.nb{border-color:#F2A516;box-shadow:inset 0 -2px 0 #F2A516}
   .lbl.dim{background:var(--paper);color:var(--ink);padding:3px 5px 2px;font:600 12px/1 var(--display);letter-spacing:.03em;font-variant-numeric:tabular-nums;border:1px solid var(--rule)}
 
   .fallback{position:fixed;inset:0;display:grid;place-items:center;padding:24px 16px;text-align:center;color:var(--ink-2)}
@@ -546,8 +547,8 @@
 
   /* ---------- espacios ---------- */
   const ROOMS = [
-    { id: 'sala', name: 'Sala · comedor · cocina', dims: '2.88 × 6.00 m', area: 17.3, rect: [3.0, W, 0, 6.0], tile: 0.45, tint: 0xE3DDD3, label: [4.5, 3.25],
-      desc: 'Un solo espacio abierto: cocina en L al fondo, comedor contra la pared del dormitorio 1 y sala frente a la puerta principal. Tiene salida trasera.' },
+    { id: 'sala', name: 'Sala · comedor · cocina', dims: '2.88 × 6.00 m', area: 17.3, rect: [3.0, W, 0, 6.0], tile: 0.45, tint: 0xE3DDD3, label: [4.1, 1.4],
+      desc: 'Un solo espacio abierto: cocina en L al fondo y sala frente a la puerta principal, separadas a media sala por una barra desayunadora con tres bancos altos. Tiene salida trasera.' },
     { id: 'd1', name: 'Dormitorio 1', dims: '3.00 × 2.50 m', area: 7.5, rect: [0, 3.0, 0, 2.5], tile: 0.45, tint: 0xD6CAB9,
       desc: 'Al fondo de la casa. Ventana de 1.38 × 1.00 m con antepecho de 1.00 m y puerta al pasillo.' },
     { id: 'bano', name: 'Baño', dims: '1.97 × 1.50 m', area: 3.0, rect: [0, BX, 2.5, 4.0], tile: 0.2, tint: 0xE4E8E8,
@@ -660,6 +661,16 @@
     if (face === '+x') fbox(cx - s, cx - s + b, cy - s, cy + s, 0.47, 0.9, COL.woodL);
     if (face === '-x') fbox(cx + s - b, cx + s, cy - s, cy + s, 0.47, 0.9, COL.woodL);
   }
+  // Banco alto de barra: asiento redondo de 0.36 m a 0.76 de alto (30 cm bajo la barra), cuatro patas de metal y aro para los pies
+  function stool(cx, cy) {
+    const s = 0.12, b = 0.008;
+    fcyl(cx, cy, 0.18, 0.72, 0.76, COL.woodL);
+    [[-s, -s], [s, -s], [-s, s], [s, s]].forEach(([dx, dy]) => fcyl(cx + dx, cy + dy, 0.012, 0, 0.72, COL.black));
+    [-s, s].forEach(d => {
+      fbox(cx - s, cx + s, cy + d - b, cy + d + b, 0.28, 0.3, COL.black);
+      fbox(cx + d - b, cx + d + b, cy - s, cy + s, 0.28, 0.3, COL.black);
+    });
+  }
   // Cama matrimonial de 1.38 × 1.90 m. head: pared de la cabecera ('-x' | '+x' | '-y' | '+y'); at: coordenada de esa pared; mid: centro a lo ancho
   function bed(head, at, mid, blanket) {
     const dir = head[0] === '-' ? 1 : -1, alongX = head[1] === 'x';
@@ -687,7 +698,7 @@
   }
 
   // Medidas de referencia: cama 1.38 × 1.90, mesa de noche 0.42, ropero 1.20 × 0.58 × 2.00, mueble de cocina 0.60 × 0.90,
-  // refri 0.63 × 0.65 × 1.75, mesa de comedor 1.10 × 0.76 × 0.76, sillas de 0.42 con asiento a 0.45, sofá de 2 puestos 1.60 × 0.80
+  // refri 0.63 × 0.65 × 1.75, barra de 1.82 × 0.55 a 1.06, bancos altos con asiento de 0.36 a 0.76, sofá de 2 puestos 1.60 × 0.80
   roomGroup('d1');
   bed('-y', 0.04, 1.95, COL.sage);                                        // cabecera contra la pared del fondo, fuera de la ventana
   fbox(0.72, 1.14, 0.06, 0.46, 0, 0.5, COL.woodL); lamp(0.93, 0.26, 0.5);  // mesa de noche bajo la ventana
@@ -724,18 +735,21 @@
   [[5.42, 1.14], [5.66, 1.14], [5.42, 1.4], [5.66, 1.4]].forEach(([x, y]) => fcyl(x, y, 0.07, 0.91, 0.92, COL.burner));
   fbox(5.5, W - 0.04, 0.66, 1.85, 1.5, 2.2, COL.cab);
   fbox(5.18, 5.81, 1.93, 2.58, 0, 1.75, COL.steel); fbox(5.14, 5.18, 2.46, 2.5, 0.9, 1.5, COL.black);
-  // Comedor contra la pared del dormitorio 1, fuera del paso de la puerta trasera y del pasillo
-  fbox(3.07, 3.83, 0.95, 2.05, 0.72, 0.76, COL.woodL); legs(3.11, 3.79, 0.99, 2.01, 0.72, COL.woodD, 0.05);
-  chair(4.06, 1.23, '-x'); chair(4.06, 1.77, '-x'); chair(3.45, 2.28, '-y');
-  // Sala: tele en la pared del dormitorio 2 y sofá enfrente, contra la pared derecha
-  fbox(3.8, 4.98, 3.8, 5.3, 0, 0.012, COL.rug);
-  fbox(5.0, 5.8, 3.75, 5.35, 0.1, 0.44, COL.sofa); fbox(5.56, 5.8, 3.75, 5.35, 0.1, 0.85, COL.sofa);
-  fbox(5.0, 5.8, 3.75, 3.93, 0.1, 0.62, COL.sofa); fbox(5.0, 5.8, 5.17, 5.35, 0.1, 0.62, COL.sofa);
-  fbox(5.05, 5.54, 3.95, 4.54, 0.44, 0.52, COL.sofaL); fbox(5.05, 5.54, 4.56, 5.15, 0.44, 0.52, COL.sofaL);
-  legs(5.02, 5.78, 3.77, 5.33, 0.1, COL.woodD, 0.05);
-  fbox(4.25, 4.65, 4.3, 4.9, 0.02, 0.36, COL.woodD); fbox(4.2, 4.7, 4.25, 4.95, 0.36, 0.4, COL.woodL);
-  fbox(3.07, 3.45, 4.1, 5.0, 0, 0.5, COL.woodD); fbox(3.08, 3.12, 4.07, 5.03, 0.85, 1.4, COL.black); // mueble y tele de 43"
-  plant(5.62, 5.72);
+  // Barra desayunadora a media sala: sale de la pared derecha después del refri y separa la cocina de la sala.
+  // Mueble de cocina de 0.28 de fondo y sobre de 0.55 con vuelo de 0.25 hacia la sala para las rodillas.
+  // Termina en x = 4.02, a plomo con las dos puertas, así queda libre el paso de 0.96 m entre las puertas y el pasillo
+  fbox(4.04, W - 0.04, 2.64, 2.92, 0, 1.02, COL.cab); fbox(4.02, W - 0.04, 2.62, 3.17, 1.02, 1.06, COL.top);
+  [4.32, 4.92, 5.52].forEach(x => stool(x, 3.33));                        // tres bancos a 0.60 del lado de la sala
+  // Sala: tele en la pared del dormitorio 2 y sofá enfrente, contra la pared derecha. La tele no pasa de y = 5.10
+  // para que la puerta principal abra completa; el sofá deja 0.60 detrás de los bancos
+  fbox(3.8, 4.98, 4.15, 5.65, 0, 0.012, COL.rug);
+  fbox(5.0, 5.8, 4.1, 5.7, 0.1, 0.44, COL.sofa); fbox(5.56, 5.8, 4.1, 5.7, 0.1, 0.85, COL.sofa);
+  fbox(5.0, 5.8, 4.1, 4.28, 0.1, 0.62, COL.sofa); fbox(5.0, 5.8, 5.52, 5.7, 0.1, 0.62, COL.sofa);
+  fbox(5.05, 5.54, 4.3, 4.89, 0.44, 0.52, COL.sofaL); fbox(5.05, 5.54, 4.91, 5.5, 0.44, 0.52, COL.sofaL);
+  legs(5.02, 5.78, 4.12, 5.68, 0.1, COL.woodD, 0.05);
+  fbox(4.25, 4.65, 4.6, 5.2, 0.02, 0.36, COL.woodD); fbox(4.2, 4.7, 4.55, 5.25, 0.36, 0.4, COL.woodL);
+  fbox(3.07, 3.45, 4.2, 5.1, 0, 0.5, COL.woodD); fbox(3.08, 3.12, 4.17, 5.13, 0.85, 1.4, COL.black); // mueble y tele de 43"
+  plant(4.23, 5.68, 0, 0.9);                                              // junto a la puerta, fuera de su giro
 
   roomGroup('corredor');
   fbox(3.24, 3.84, 6.1, 6.45, -0.03, -0.018, COL.mat);
@@ -797,13 +811,25 @@
     std({ map: T_earth, color: 0xd9c3b6, roughness: 1 }), 0.01, 1);
   // Línea roja sobre el borde exacto del lote y un mojón en cada vértice
   const lotRed = new THREE.MeshBasicMaterial({ color: 0xE0241B });
-  LOT.forEach((pt, i) => {
-    const q = LOT[(i + 1) % 4], len = Math.hypot(q[0] - pt[0], q[1] - pt[1]);
-    const seg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, len + 0.08), lotRed);
-    seg.position.set((pt[0] + q[0]) / 2, 0.045, (pt[1] + q[1]) / 2); seg.rotation.y = Math.atan2(q[0] - pt[0], q[1] - pt[1]);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 10), lotRed);
-    post.position.set(pt[0], 0.175, pt[1]); site.add(seg, post);
-  });
+  const lotEdge = (p, q, material, w) => {
+    const len = Math.hypot(q[0] - p[0], q[1] - p[1]), seg = new THREE.Mesh(new THREE.BoxGeometry(w, w / 2, len + w), material);
+    seg.position.set((p[0] + q[0]) / 2, 0.025 + w / 4, (p[1] + q[1]) / 2); seg.rotation.y = Math.atan2(q[0] - p[0], q[1] - p[1]); site.add(seg);
+  };
+  const mojon = (p, material, r) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.35, 10), material);
+    post.position.set(p[0], 0.175, p[1]); site.add(post);
+  };
+  LOT.forEach((pt, i) => { lotEdge(pt, LOT[(i + 1) % 4], lotRed, 0.08); mojon(pt, lotRed, 0.05); });
+
+  // Lote de la derecha visto desde la calle (al oeste), de su propio plano catastrado (219 m²). Su línea 2-3 es la 4-1 de este lote
+  // al revés (24.71 m), así que su vértice 2 es nuestro 1 y su 3 es nuestro 4. Los otros dos salen de su derrotero: el polígono
+  // cierra con 4 mm y su frente y su fondo siguen las líneas 1-2 y 3-4 de este lote (a 6 mm y 1 mm). Borde amarillo, más delgado
+  const DERROTERO_DER = [[[61, 20, 29], 8.0], [[170, 57, 13], 24.71], [[236, 57, 6], 10.86], [[356, 5, 55], 26.55]];
+  const walk = (pt, [az, dist], k) => { const d = azDir(azRad(az)); return [pt[0] + d.x * dist * k, pt[1] + d.z * dist * k]; };
+  const LOT_DER = [walk(LOT[0], DERROTERO_DER[0], -1), LOT[0], LOT[3], walk(LOT[3], DERROTERO_DER[2], 1)];
+  const lotAmber = new THREE.MeshBasicMaterial({ color: 0xF2A516 });
+  [0, 2, 3].forEach(i => lotEdge(LOT_DER[i], LOT_DER[(i + 1) % 4], lotAmber, 0.07));   // la línea compartida queda roja
+  [0, 3].forEach(i => mojon(LOT_DER[i], lotAmber, 0.045));
 
   // Calle pública: derecho de vía de 11.08 m frente a la línea 1-2 (plano). La carretera de lastre de 6 m arranca al ras del lote (dueña)
   const c1 = LOT[0], c2 = LOT[1], cl = Math.hypot(c2[0] - c1[0], c2[1] - c1[1]);
@@ -880,7 +906,7 @@
   }
   // Árboles fuera de la casa, de los vecinos y de la calle (dos pequeños en el patio del fondo)
   [[2.6, -10.5, 0.85], [-2.4, -11.4, 0.75], [0.5, -19, 1.6], [-8, -17.5, 1.3], [9, -18.5, 1.4], [-14.5, -2, 1.3], [15, 1.5, 1.2],
-   [14.5, -10, 1.5], [-13, -11, 1.2], [-13, 9, 1.1], [-7, 30, 1.2], [8, 26, 1.3], [21, 21, 1.1]]
+   [16.6, -9.5, 1.5], [-13, -11, 1.2], [-13, 9, 1.1], [-7, 30, 1.2], [8, 26, 1.3], [21, 21, 1.1]]
     .forEach(([x, z, sc], i) => tree(x, z, sc, 20 + i));
   [[-3.6, 5.5, .4], [3.7, -6.2, .45]].forEach(([x, z, sc], i) => {
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2 * sc, 1), leafMats[i % 4]);
@@ -985,6 +1011,23 @@
     lotLabel('dim', `${DERROTERO[i][1].toFixed(2)} m`, new V3(m[0] + (lotMid[0] - m[0]) * k, 0.06, m[1] + (lotMid[1] - m[1]) * k));
     lotLabel('dim lot-pt', String(i + 1), new V3(pt[0], 0.4, pt[1]));
   });
+  // Lote vecino de la derecha: sus tres lados propios, por fuera como los de este lote (el lado compartido es el 24.71),
+  // y su área cerca del fondo, lejos de la casa vecina
+  const derMid = LOT_DER.reduce((acc, pt) => [acc[0] + pt[0] / 4, acc[1] + pt[1] / 4], [0, 0]);
+  const derPos = (p, q, d) => {
+    const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], k = d / Math.hypot(derMid[0] - m[0], derMid[1] - m[1]);
+    return new V3(m[0] + (derMid[0] - m[0]) * k, 0.06, m[1] + (derMid[1] - m[1]) * k);
+  };
+  [0, 2, 3].forEach(i => lotLabel('dim nb', `${DERROTERO_DER[i][1].toFixed(2)} m`, derPos(LOT_DER[i], LOT_DER[(i + 1) % 4], -0.9)));
+  lotLabel('dim nb', 'Lote vecino · 219 m²', derPos(LOT_DER[2], LOT_DER[3], 4.5));
+  const derFill = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(LOT_DER.map(([x, z]) => new THREE.Vector2(x, -z)))),
+    new THREE.MeshBasicMaterial({ color: 0xF2A516, transparent: true, opacity: 0.18, depthWrite: false }));
+  derFill.geometry.rotateX(-Math.PI / 2); derFill.position.y = 0.03; lotDims.add(derFill);
+  // Centro de los dos lotes, medido a lo largo del norte y del este (para encuadrar la vista Lote)
+  const siteMid = [azDir(0), EAST].reduce((acc, dir) => {
+    const s = LOT.concat([LOT_DER[0], LOT_DER[3]]).map(([x, z]) => x * dir.x + z * dir.z), c = (Math.min(...s) + Math.max(...s)) / 2;
+    return [acc[0] + dir.x * c, acc[1] + dir.z * c];
+  }, [0, 0]);
   // Distancias medidas sobre los ejes de la casa: iguales adelante y atrás, e iguales a los dos lados
   const [zBack, zFront] = cross(0), [xLeft, xRight] = cross(1);
   dimLine(W / 2, 7.06, W / 2, zFront + D / 2, (zFront - Z(7.06)).toFixed(2), lotDims);
@@ -1083,12 +1126,14 @@
     frente: { p: [0.4, 2.0, 12.8], t: [0, 1.6, 0], roof: true },
     interior: { p: [6.2, 11.2, 8.8], t: [0, 0, 0.2], roof: false },
     planta: { p: [0, 17, 0.31], t: [0, 0, 0.3], roof: false, dims: true },   // el fondo queda arriba, como en el PDF
-    lote: { p: [lotMid[0] + SOUTH.x * 0.02, 46, lotMid[1] + SOUTH.z * 0.02], t: [lotMid[0], 0, lotMid[1]], roof: true, dims: true }, // norte arriba, como el plano catastrado
+    // Norte arriba, como el plano catastrado, con este lote y el vecino de la derecha. En pantalla ancha se corre al oeste
+    // para que los lotes queden fuera del panel de la izquierda
+    lote: { p: [siteMid[0] + SOUTH.x * 0.02, 56, siteMid[1] + SOUTH.z * 0.02], t: [siteMid[0], 0, siteMid[1]], roof: true, dims: true, pan: [-EAST.x * 4, -EAST.z * 4] },
   };
   function viewPose(name) {
     const v = VIEWS[name], t = new V3(...v.t), p = new V3(...v.p), a = camera.aspect;
     if (a < 1.25) p.sub(t).multiplyScalar(Math.min(2.3, 1.25 / a)).add(t);
-    if (window.innerWidth > 800) { p.x -= 1.2; t.x -= 1.2; }
+    if (window.innerWidth > 800) { const [dx, dz] = v.pan || [-1.2, 0]; p.x += dx; t.x += dx; p.z += dz; t.z += dz; }
     return { p, t };
   }
   let tween = null;
