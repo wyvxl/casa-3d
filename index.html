@@ -686,7 +686,7 @@
   });
 
   /* ---------- muebles ---------- */
-  const COL = { woodD: 0x6B4A34, woodL: 0xB78D63, linen: 0xF2EEE6, sage: 0x8EA58A, clay: 0xC3836A, pillow: 0xFBF9F4, cab: 0xEEEAE3, top: 0x3A3836, steel: 0xC5CACD, black: 0x232527, sofa: 0x5C6B70, sofaL: 0x6E7E83, rug: 0xD7C7AE, white: 0xF6F6F3, pot: 0xB8694A, mat: 0x3F3A35, burner: 0x4a4c4e, sink: 0x8f959a, pila: 0x8C3A34 };
+  const COL = { woodD: 0x6B4A34, woodL: 0xB78D63, linen: 0xF2EEE6, sage: 0x8EA58A, clay: 0xC3836A, pillow: 0xFBF9F4, cab: 0xEEEAE3, top: 0x3A3836, steel: 0xC5CACD, black: 0x232527, sofa: 0x5C6B70, sofaL: 0x6E7E83, but: 0xB5715A, butL: 0xC4826B, rug: 0xD7C7AE, white: 0xF6F6F3, pot: 0xB8694A, mat: 0x3F3A35, burner: 0x4a4c4e, sink: 0x8f959a, pila: 0x8C3A34 };
   const matCache = {};
   const mat = c => typeof c === 'number' ? (matCache[c] || (matCache[c] = std({ color: c, roughness: .75 }))) : c;
   let fp = furn;
@@ -721,6 +721,23 @@
       fbox(cx + d - b, cx + d + b, cy - s, cy + s, 0.28, 0.3, COL.black);
     });
   }
+  // Butaca de 0.70 × 0.68 m, de la misma familia del sofá. back: pared o lado donde va el respaldo
+  // ('-x' | '+x' | '-y' | '+y'); at: coordenada de la cara de atrás; mid: centro a lo ancho
+  function butaca(back, at, mid) {
+    const dir = back[0] === '-' ? 1 : -1, alongX = back[1] === 'x';
+    const B = (u0, u1, v0, v1, z0, z1, c) => {
+      const p = [at + dir * u0, at + dir * u1].sort((a, b) => a - b);
+      return alongX ? fbox(p[0], p[1], mid + v0, mid + v1, z0, z1, c) : fbox(mid + v0, mid + v1, p[0], p[1], z0, z1, c);
+    };
+    B(0, 0.68, -0.35, 0.35, 0.1, 0.44, COL.but);        // asiento
+    B(0, 0.2, -0.35, 0.35, 0.1, 0.85, COL.but);         // respaldo
+    B(0, 0.68, -0.35, -0.25, 0.1, 0.62, COL.but);       // brazos
+    B(0, 0.68, 0.25, 0.35, 0.1, 0.62, COL.but);
+    B(0.22, 0.64, -0.24, 0.24, 0.44, 0.52, COL.butL);   // cojín
+    const p = [at + dir * 0.02, at + dir * 0.66].sort((a, b) => a - b);
+    if (alongX) legs(p[0], p[1], mid - 0.33, mid + 0.33, 0.1, COL.woodD, 0.05);
+    else legs(mid - 0.33, mid + 0.33, p[0], p[1], 0.1, COL.woodD, 0.05);
+  }
   // Cama matrimonial de 1.38 × 1.90 m. head: pared de la cabecera ('-x' | '+x' | '-y' | '+y'); at: coordenada de esa pared; mid: centro a lo ancho
   function bed(head, at, mid, blanket) {
     const dir = head[0] === '-' ? 1 : -1, alongX = head[1] === 'x';
@@ -748,7 +765,7 @@
   }
 
   // Medidas de referencia: cama 1.38 × 1.90, mesa de noche 0.42, ropero 1.20 × 0.58 × 2.00, mueble de cocina 0.60 × 0.90,
-  // refri 0.63 × 0.65 × 1.75, barra de 1.82 × 0.55 a 1.06, bancos altos con asiento de 0.36 a 0.76, sofá de 2 puestos 1.60 × 0.80
+  // refri 0.63 × 0.65 × 1.75, barra de 1.82 × 0.55 a 1.06, bancos altos con asiento de 0.36 a 0.76, butacas de 0.70 × 0.68
   roomGroup('d1');
   bed('-y', 0.04, 1.95, COL.sage);                                        // cabecera contra la pared del fondo, fuera de la ventana
   fbox(0.72, 1.14, 0.06, 0.46, 0, 0.5, COL.woodL); lamp(0.93, 0.26, 0.5);  // mesa de noche bajo la ventana
@@ -790,16 +807,12 @@
   // Termina en x = 4.02, a plomo con las dos puertas, así queda libre el paso de 0.96 m entre las puertas y el pasillo
   fbox(4.04, W - 0.04, 2.64, 2.92, 0, 1.02, COL.cab); fbox(4.02, W - 0.04, 2.62, 3.17, 1.02, 1.06, COL.top);
   [4.32, 4.92, 5.52].forEach(x => stool(x, 3.33));                        // tres bancos a 0.60 del lado de la sala
-  // Sala: tele en la pared del dormitorio 2 y sofá enfrente, contra la pared derecha. La tele no pasa de y = 5.10
-  // para que la puerta principal abra completa; el sofá deja 0.60 detrás de los bancos
-  fbox(3.8, 4.98, 4.15, 5.65, 0, 0.012, COL.rug);
-  fbox(5.0, 5.8, 4.1, 5.7, 0.1, 0.44, COL.sofa); fbox(5.56, 5.8, 4.1, 5.7, 0.1, 0.85, COL.sofa);
-  fbox(5.0, 5.8, 4.1, 4.28, 0.1, 0.62, COL.sofa); fbox(5.0, 5.8, 5.52, 5.7, 0.1, 0.62, COL.sofa);
-  fbox(5.05, 5.54, 4.3, 4.89, 0.44, 0.52, COL.sofaL); fbox(5.05, 5.54, 4.91, 5.5, 0.44, 0.52, COL.sofaL);
-  legs(5.02, 5.78, 4.12, 5.68, 0.1, COL.woodD, 0.05);
-  fbox(4.25, 4.65, 4.6, 5.2, 0.02, 0.36, COL.woodD); fbox(4.2, 4.7, 4.55, 5.25, 0.36, 0.4, COL.woodL);
-  fbox(3.07, 3.45, 4.2, 5.1, 0, 0.5, COL.woodD); fbox(3.08, 3.12, 4.17, 5.13, 0.85, 1.4, COL.black); // mueble y tele de 43"
-  plant(4.23, 5.68, 0, 0.9);                                              // junto a la puerta, fuera de su giro
+  // Sala: dos butacas contra la pared derecha, sin nada en medio (pedido de la dueña, 2026-09-20: sin sofá, sin tele
+  // y sin mesita). La de atrás arranca en y = 4.14, para dejar 0.60 detrás de los bancos de la barra, y la del frente
+  // termina en y = 5.90, a 0.06 de la pared del frente. El respaldo llega a x = 5.80, justo por dentro de las columnas
+  fbox(4.35, 5.82, 4.08, 5.92, 0, 0.012, COL.rug);
+  butaca('+x', 5.8, 4.49); butaca('+x', 5.8, 5.55);                       // las dos butacas, x 5.12 a 5.80, a 0.36 una de otra
+  plant(4.23, 5.68, 0, 0.9);                                              // junto a la puerta principal, fuera de su giro
 
   roomGroup('corredor');
   fbox(3.24, 3.84, 6.1, 6.45, -0.03, -0.018, COL.mat);
@@ -915,9 +928,12 @@
   /* Casa del vecino de la derecha: medidas por fuera sacadas de las fotos y de la vista satelital (unos ±0.5 m); ver la sección de
      la casa más abajo. Está torcida con la colindancia 4-1 (rot): el frente se abre hacia su lote y atrás se acerca a la línea.
      at: [metros al oeste de la colindancia, metros desde el vértice 1 a lo largo de ella] del centro del borde este de su techo,
-     medido en la vista satelital. Con rot, la esquina de atrás del techo se mete 0.50 m en este lote, como dice la dueña.
+     medido en la vista satelital. Pedido de la dueña el 2026-09-20: correrla hasta que su techo no pase la línea, quedando
+     al ras en la esquina de atrás, pero con el mismo giro. Con rot, medio techo mide 5.205 m, así que la esquina de atrás
+     se corre 5.205 · sen 6.5° = 0.589 m al este del centro: poniendo at[0] = 0.59 esa esquina cae sobre la línea (0.8 mm
+     adentro de su lote) y la del frente queda 1.18 m adentro. Antes at[0] era 0.10 y la esquina de atrás se metía 0.49 m.
      Marco propio: u a lo ancho (de la cara este a la oeste) y v de su frente hacia atrás */
-  const YH = { w: 6.0, d: 9.45, bay: 1.35, fl: 0.15, h: 2.5, ovf: 0.48, ovs: 0.15, rise: 1.1, rot: 6.5, at: [0.1, 13.1], shed: 5.0 };
+  const YH = { w: 6.0, d: 9.45, bay: 1.35, fl: 0.15, h: 2.5, ovf: 0.48, ovs: 0.15, rise: 1.1, rot: 6.5, at: [0.59, 13.1], shed: 5.0 };
   const yRot = YH.rot * Math.PI / 180;
   const hv = [bu[0] * Math.cos(yRot) - bw[0] * Math.sin(yRot), bu[1] * Math.cos(yRot) - bw[1] * Math.sin(yRot)];
   const hu = [bw[0] * Math.cos(yRot) + bu[0] * Math.sin(yRot), bw[1] * Math.cos(yRot) + bu[1] * Math.sin(yRot)];
