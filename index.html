@@ -128,6 +128,19 @@
   .sw input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}
   .sw.custom:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 
+  .move{display:flex;flex-direction:column}
+  .move-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:8px}
+  .move-row label{font:600 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+  .move output{font:600 17px/1 var(--display);font-variant-numeric:tabular-nums}
+  .move input{-webkit-appearance:none;appearance:none;width:100%;height:24px;background:transparent;margin:2px 0 0;cursor:pointer}
+  .move input::-webkit-slider-runnable-track{height:8px;background:var(--paper-2);border:1px solid var(--rule-strong)}
+  .move input::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:22px;margin-top:-8px;background:var(--paper);border:2px solid var(--ink);border-radius:2px}
+  .move input::-moz-range-track{height:8px;background:var(--paper-2);border:1px solid var(--rule-strong)}
+  .move input::-moz-range-thumb{width:10px;height:18px;background:var(--paper);border:2px solid var(--ink);border-radius:2px}
+  .move .btn{margin-top:12px;padding:9px 10px;background:none;border:1px solid var(--rule-strong);color:var(--ink);font:600 12px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
+  .move .btn:hover{background:var(--paper-2)}
+  .move .note{margin-top:8px}
+
   .hint{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);margin:0;padding:7px 12px;background:var(--paper);border:1px solid var(--rule);color:var(--ink-2);font-size:12.5px;white-space:nowrap;pointer-events:none;transition:opacity .6s ease}
   .hint.is-gone{opacity:0}
 
@@ -212,7 +225,9 @@
           <label class="tog"><input type="checkbox" id="t-dims"><span class="box"></span>Medidas</label>
           <label class="tog"><input type="checkbox" id="t-nb" checked><span class="box"></span>Vecinos</label>
           <label class="tog"><input type="checkbox" id="t-boq"><span class="box"></span>Boquete</label>
-          <label class="tog"><input type="checkbox" id="t-extra"><span class="box"></span>Grada</label>
+          <label class="tog"><input type="checkbox" id="t-losa"><span class="box"></span>Losa</label>
+          <label class="tog"><input type="checkbox" id="t-techo"><span class="box"></span>Techo losa</label>
+          <label class="tog"><input type="checkbox" id="t-extra"><span class="box"></span>Grada y plantas</label>
         </div>
         <p class="note" id="names-note">Los nombres de los espacios se ven al quitar el techo.</p>
       </fieldset>
@@ -226,6 +241,17 @@
       <details class="paint-box" id="paint-box">
         <summary><span class="sec-h">Colores</span><span class="sum-note">fachada, columnas e interior</span><i class="chev"></i></summary>
         <div class="paints" id="paints"></div>
+      </details>
+      <details class="paint-box" id="move-box">
+        <summary><span class="sec-h">Mover casa</span><span class="sum-note">dentro del lote</span><i class="chev"></i></summary>
+        <div class="move">
+          <div class="move-row"><label for="mv-front">Hacia el fondo</label><output id="mv-front-out" for="mv-front">0.00 m</output></div>
+          <input type="range" id="mv-front" min="-4" max="14" step="0.05" value="0">
+          <div class="move-row"><label for="mv-side">Hacia la izquierda</label><output id="mv-side-out" for="mv-side">0.00 m</output></div>
+          <input type="range" id="mv-side" min="0" max="5" step="0.05" value="0">
+          <button type="button" class="btn" id="mv-reset">Volver al sitio original</button>
+          <p class="note">La casa se topa en las l&iacute;neas del lote, el corte del fondo y el muro del boquete.</p>
+        </div>
       </details>
     </div>
   </details>
@@ -420,6 +446,9 @@
     bulb: std({ color: 0xffffff, emissive: 0xffe2b0, emissiveIntensity: 0, roughness: .4 }),
     leaf: std({ color: 0x4F7F3E, roughness: .9, flatShading: true }),
   };
+  // Follaje de los árboles, los arbustos y las jardineras del lote
+  const leafMats = [0x4c7a3b, 0x5f8c46, 0x3f6a34, 0x6e9a52].map(c => std({ color: c, roughness: .9, flatShading: true }));
+  const bark = std({ color: 0x5b4332, roughness: 1 });
 
   const house = new THREE.Group(); scene.add(house);
   const roof = new THREE.Group(); scene.add(roof);
@@ -875,6 +904,13 @@
   let be = [-(LOT[2][1] - LOT[1][1]) / L23, (LOT[2][0] - LOT[1][0]) / L23];
   if (-LOT[1][0] * be[0] - LOT[1][1] * be[1] > 0) be = [-be[0], -be[1]];
   const eOf = (x, z) => (x - LOT[1][0]) * be[0] + (z - LOT[1][1]) * be[1];
+  /* Orilla izquierda (colindancia 2-3, la del vecino de la izquierda): ahí van la grada y la zona de plantas (pedido de la dueña,
+     2026-09-19). e: metros adentro del lindero; t: metros del vértice 2 hacia el fondo. EP(e, t) da el punto en el mundo.
+     De la tapia hacia adentro: la jardinera (bed), la grada (stair) y, pasando open, la losa del boquete */
+  const eu = [(LOT[2][0] - LOT[1][0]) / L23, (LOT[2][1] - LOT[1][1]) / L23];
+  const EP = (e, t) => [LOT[1][0] + eu[0] * t - be[0] * e, LOT[1][1] + eu[1] * t - be[1] * e];
+  const eYaw = Math.atan2(-eu[1], eu[0]);                     // giro de las cajas que corren a lo largo de ese lindero
+  const LEFT = { edge: 0.05, bed: 0.6, stair: 1.1, open: 1.85 };
 
   /* Casa del vecino de la derecha: medidas por fuera sacadas de las fotos y de la vista satelital (unos ±0.5 m); ver la sección de
      la casa más abajo. Está torcida con la colindancia 4-1 (rot): el frente se abre hacia su lote y atrás se acerca a la línea.
@@ -1032,36 +1068,69 @@
   const road = new THREE.Mesh(drape(roadGeo, 0.03), std({ map: T_asphalt, color: 0x7f8281, roughness: .95 }));
   road.receiveShadow = true; site.add(road);
 
-  // Piedrilla al frente de la casa (fotos), en la franja de BOQ.gap entre la casa y el muro del boquete, hasta la colindancia derecha
+  // Piedrilla al frente de la casa (fotos), en la franja de BOQ.gap entre la casa y el muro del boquete, hasta la colindancia
+  // derecha. Va en su propio grupo porque se corre con la casa (cuadro Mover casa)
+  const frontPad = new THREE.Group(); site.add(frontPad);
   {
     const x0 = X(-0.5), x1 = c1[0] + bu[0] * (SITE.front - BOQ.gap / 2) - 0.02;
-    const gravel = flat(scaleUV(new THREE.PlaneGeometry(x1 - x0, BOQ.gap), (x1 - x0) / 1.2, BOQ.gap / 1.2), std({ map: T_gravel, color: 0xc4c1bc, roughness: 1 }), 0.02, 2);
+    const gravel = flat(scaleUV(new THREE.PlaneGeometry(x1 - x0, BOQ.gap), (x1 - x0) / 1.2, BOQ.gap / 1.2), std({ map: T_gravel, color: 0xc4c1bc, roughness: 1 }), 0.02, 2, frontPad);
     gravel.position.set((x0 + x1) / 2, 0.02, Z(D + 0.08) + BOQ.gap / 2);
   }
-  // Grada (capa extra, se decide después), con huellas iguales y contrahuellas de no más de 18 cm. Hoy baja por el talud hasta la
-  // calle; con el boquete va pegada al muro, del lado de la calle, y baja hacia la izquierda desde junto a la puerta principal
+  /* Grada (capa Grada y plantas, se decide después): recostada a la orilla izquierda del lote y pegada a la tapia del vecino de la
+     izquierda (pedido de la dueña, 2026-09-19), con contrahuellas de no más de 18 cm. Hoy baja por el talud hasta la calle; con el
+     boquete arranca al nivel del patio, en la cara del muro de atrás, y baja por la orilla hasta el piso del garaje, así que la losa
+     (capa Losa) deja esa franja libre. Al lado, contra la tapia, la zona de plantas: jardineras que suben con la grada */
   const extraNow = new THREE.Group(), extraBoq = new THREE.Group(); extra.add(extraNow, extraBoq);
-  {
-    const padX = X(4.5), zCrest = c1[1] - (GROUND.talud + (padX - c1[0]) * cn[0]) / cn[1];
-    const tp = tAl(padX, zCrest), rise = -streetY(tp), sTop = GROUND.talud + 0.05, sBot = -0.55;   // arranca en la orilla y el primer escalón queda en la calle
-    const n = Math.ceil(rise / 0.18), tread = (sTop - sBot) / n;
+  const stairE = LEFT.edge + LEFT.bed + LEFT.stair / 2;                     // eje de la grada, del lindero hacia adentro
+  // Grada recta a lo largo del lindero: el escalón de arriba llega a tTop, al nivel yTop, y baja hacia la calle hasta yBot. Con tBot
+  // la huella se reparte entre los dos extremos; sin él mide tread. Devuelve los datos para acomodar las jardineras al lado
+  const leftStair = (tTop, yTop, yBot, parent, tBot, tread = 0.3) => {
+    const n = Math.max(1, Math.ceil((yTop - yBot) / 0.18));
+    if (tBot !== undefined) tread = (tTop - tBot) / n;
     for (let i = 0; i < n; i++) {
-      const sm = sTop - (i + 0.5) * tread, top = -rise * i / n, bot = -rise - 0.05;
-      const step = addBox(1.1, top - bot, tread + 0.01, M.concrete, c1[0] + cu[0] * tp - cn[0] * sm, (top + bot) / 2, c1[1] + cu[1] * tp - cn[1] * sm, extraNow);
-      step.rotation.y = Math.atan2(-cu[1], cu[0]);
+      const top = yTop - (yTop - yBot) * i / n, bot = yBot - 0.4, [x, z] = EP(stairE, tTop - (i + 0.5) * tread);
+      const step = addBox(tread + 0.01, top - bot, LEFT.stair, M.concrete, x, (top + bot) / 2, z, parent);
+      step.rotation.y = eYaw;
     }
+    return { tTop, yTop, yBot, n, tread, tBot: tTop - n * tread };
+  };
+  // Jardinera de concreto contra la tapia, con tierra y matas encima. Arranca abajo, en base, y llega a top
+  const bedMat = std({ color: 0xBFB6A8, map: T_concrete, roughness: .95 });
+  const soilMat = std({ map: T_earth, color: 0xb98b74, roughness: 1 });
+  const gardenBed = (t0, t1, top, base, parent, seed) => {
+    const len = t1 - t0, [x, z] = EP(LEFT.edge + LEFT.bed / 2, (t0 + t1) / 2), bot = base - 0.4;
+    const box = addBox(len, top - bot, LEFT.bed, bedMat, x, (top + bot) / 2, z, parent);
+    box.rotation.y = eYaw; scaleUV(box.geometry, len, (top - bot) / 0.5);
+    const soil = addBox(len - 0.16, 0.06, LEFT.bed - 0.16, soilMat, x, top - 0.03, z, parent); soil.rotation.y = eYaw;
+    const r = rng(seed);
+    for (let i = 0, n = Math.max(1, Math.round(len / 0.5)); i < n; i++) {
+      const [px, pz] = EP(LEFT.edge + LEFT.bed / 2 + (r() - .5) * 0.22, t0 + len * (i + .5) / n), rad = 0.17 + r() * 0.13;
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), leafMats[(r() * 4) | 0]);
+      m.position.set(px, top + rad * 0.55, pz); m.scale.y = 0.85; m.castShadow = m.receiveShadow = true; parent.add(m);
+    }
+  };
+  // La zona de plantas sube con la grada: una jardinera cada dos escalones, otra abajo hasta tFront y, si hay campo, otra arriba
+  const gardenZone = (st, tFront, tBack, parent, seed) => {
+    for (let i = 0; i < st.n; i += 2) {
+      const j = Math.min(st.n, i + 2), y = st.yTop - (st.yTop - st.yBot) * i / st.n;
+      gardenBed(st.tTop - j * st.tread, st.tTop - i * st.tread, y + 0.3, st.yBot, parent, seed + i);
+    }
+    if (st.tBot - tFront > 0.4) gardenBed(tFront, st.tBot, st.yBot + 0.35, st.yBot, parent, seed + 41);
+    if (tBack !== undefined && tBack - st.tTop > 0.4) gardenBed(st.tTop, tBack, st.yTop + 0.3, st.yTop, parent, seed + 71);
+  };
+  {
+    // Hoy: la grada baja por el talud, del borde de la terraza a la calle (el primer escalón queda en la calle, como el terreno)
+    const s0 = sIn(...EP(stairE, 0)), kS = sIn(...EP(stairE, 1)) - s0, tOf = s => (s - s0) / kS;
+    const tTop = tOf(GROUND.talud + 0.05), tBot = tOf(-0.55);
+    const st = leftStair(tTop, 0, streetY(tAl(...EP(stairE, tBot))), extraNow, tBot);
+    gardenZone(st, tOf(-0.3), tTop + 3.0, extraNow, 5);
   }
   {
-    // Marco del muro: w al oeste (a lo largo del muro) y v hacia el fondo; la grada ocupa 0.90 frente al muro
-    const P = (w, v) => [c1[0] + bw[0] * w + bu[0] * v, c1[1] + bw[1] * w + bu[1] * v];
-    const w0 = X(3.0) - c1[0], vb = BOQ.depth, dep = 0.9, run = 0.28;
-    const rise = -floorY(...P(w0 - 3, vb - dep / 2)), n = Math.ceil(rise / 0.18);
-    const put = (wa, wb, top) => {
-      const [x, z] = P((wa + wb) / 2, vb - dep / 2), bot = floorY(x, z) - 0.1;
-      const m = addBox(wb - wa, top - bot, dep, M.concrete, x, (top + bot) / 2, z, extraBoq); m.rotation.y = Math.atan2(-bw[1], bw[0]);
-    };
-    put(w0 - dep, w0, 0);                                                   // descanso arriba, al nivel del patio
-    for (let i = 1; i < n; i++) put(w0 - dep - i * run, w0 - dep - (i - 1) * run, -rise * i / n);
+    // Con el boquete: del piso del garaje a la cara del muro de atrás, ya al nivel del patio
+    const v0 = vOf(...EP(stairE, 0)), kV = vOf(...EP(stairE, 1)) - v0, tOf = v => (v - v0) / kV;
+    const tTop = tOf(BOQ.depth);
+    const st = leftStair(tTop, 0, floorY(...EP(stairE, tTop - 3.6)), extraBoq);
+    gardenZone(st, 0.15, undefined, extraBoq, 9);
   }
 
   // Casa vecina de la izquierda (al este), pegada a la colindancia 2-3 con la pared justo sobre la línea del lote.
@@ -1272,6 +1341,139 @@
     boqMid = pts.reduce((acc, [x, z]) => [acc[0] + x / pts.length, acc[1] + z / pts.length], [0, 0]);
   }
 
+  /* ---------- losa sobre el boquete (capas Losa y Techo losa) ---------- */
+  /* Losa (capa Losa, proyecto de la dueña): losa de concreto sobre el boquete, a la altura que pasa un vehículo a lo largo del
+     garaje. Va del lindero derecho hasta la franja de la izquierda —que queda abierta para la grada y la zona de plantas— y de la
+     calle hasta el muro de atrás, donde se apoya. Al frente lleva una viga de borde sobre tres columnas, así quedan dos entradas.
+     La cara de abajo se pone LOSA.clear sobre el punto más alto del piso del garaje, y LOSA.clear más el peralte de la viga en el
+     frente. Como el piso del boquete está 1.45 a 1.80 m bajo el patio, la losa queda como 0.75 m arriba de él: de ahí las gradas
+     del patio a la losa, que van a la izquierda de la casa porque en la franja de piedrilla del frente solo hay 1.00 m.
+     Techo losa (capa Techo losa, encima de la anterior): techo de una sola agua con caída hacia la calle, baranda de madera en las
+     tres orillas de afuera y jardineras colgadas de la baranda, con las matas cayendo por la orilla */
+  const LOSA = { clear: 2.1, thick: 0.15, beam: 0.1, col: 0.25, over: 0.3 };
+  const TECHO = { low: 2.25, high: 2.7, thick: 0.08, post: 0.12, rail: 0.95 };
+  const losaG = new THREE.Group(); boqG.add(losaG);              // la losa solo existe con el boquete
+  const losaRoof = new THREE.Group(); losaG.add(losaRoof);       // el techo, la baranda y las matas van con la losa
+  const losaSteps = new THREE.Group(); losaG.add(losaSteps);     // gradas del patio a la losa: se corren de lado con la casa
+  let losaY = 0, losaMid = [0, 0], stepRoom = 0;
+  {
+    const conc = std({ color: 0xBEB9B1, map: T_concrete, roughness: .95 });
+    const wood = std({ color: 0x9A6B3C, roughness: .7 });
+    const woodD = std({ color: 0x74502F, roughness: .7 });
+    const zinc = std({ map: T_roof, color: 0xC9CFD2, roughness: .5, metalness: .12 });
+    const shapeOf = q => new THREE.Shape(q.map(([x, z]) => new THREE.Vector2(x, -z)));
+    // Planta de la losa: el boquete hasta la cara de atrás del muro, menos la franja abierta de la izquierda
+    const poly = clipIn(clipIn(LOT, ([x, z]) => BOQ.depth + BOQ.wall - vOf(x, z)), ([x, z]) => -eOf(x, z) - LEFT.open);
+    const cen = poly.reduce((a, [x, z]) => [a[0] + x / poly.length, a[1] + z / poly.length], [0, 0]);
+    losaMid = cen;
+    // El piso del garaje es un plano, así que su punto más alto cae en un vértice
+    const soffit = Math.max(...poly.map(([x, z]) => floorY(x, z) + LOSA.clear + (sIn(x, z) < 0.5 ? LOSA.beam : 0)));
+    losaY = soffit + LOSA.thick;
+    const geo = scaleUV(new THREE.ExtrudeGeometry(shapeOf(poly), { depth: LOSA.thick, bevelEnabled: false }), 1 / 3, 1 / 3);
+    geo.rotateX(-Math.PI / 2); geo.translate(0, soffit, 0);
+    const slab = new THREE.Mesh(geo, conc); slab.castShadow = slab.receiveShadow = true; losaG.add(slab);
+
+    // Viga de borde y tres columnas al frente, que es por donde la losa queda abierta a la calle
+    const front = poly.filter(([x, z]) => sIn(x, z) < 0.05);
+    if (front.length === 2) {
+      const [A, B] = front, len = Math.hypot(B[0] - A[0], B[1] - A[1]), yaw = Math.atan2(-(B[1] - A[1]), B[0] - A[0]);
+      const inw = [-cn[0] * LOSA.col / 2, -cn[1] * LOSA.col / 2];                 // media columna hacia adentro del lote
+      const beam = addBox(len, LOSA.beam, LOSA.col, conc, (A[0] + B[0]) / 2 + inw[0], soffit - LOSA.beam / 2, (A[1] + B[1]) / 2 + inw[1], losaG);
+      beam.rotation.y = yaw;
+      const e = (LOSA.col / 2 + 0.05) / len;
+      [e, 0.5, 1 - e].forEach(f => {
+        const x = A[0] + (B[0] - A[0]) * f + inw[0], z = A[1] + (B[1] - A[1]) * f + inw[1];
+        const top = soffit - LOSA.beam, bot = floorY(x, z) - 0.25;
+        addBox(LOSA.col, top - bot, LOSA.col, conc, x, (top + bot) / 2, z, losaG).rotation.y = yaw;
+      });
+    }
+    // Gradas del patio a la losa, a la izquierda de la casa. Se corren de lado con ella, hasta donde alcanza la losa (stepRoom)
+    {
+      const yW = D + 0.08 + BOQ.gap, n = Math.max(2, Math.ceil(losaY / 0.18)), tr = 0.3, wSt = 1.2, xc = X(-0.84);
+      for (let i = 1; i < n; i++) {
+        const top = losaY * i / n, bot = -0.2;
+        addBox(wSt, top - bot, tr, conc, xc, (top + bot) / 2, Z(yW - (n - i - 0.5) * tr), losaSteps);
+      }
+      stepRoom = (-eOf(xc - wSt / 2, Z(yW - (n - 0.5) * tr)) - LEFT.open - 0.25) / -(bw[0] * be[0] + bw[1] * be[1]);
+    }
+
+    // Techo de una sola agua: alto del lado de la casa y con caída hacia la calle, para que el agua no caiga en el patio
+    const techoY = (x, z) => losaY + TECHO.low + (TECHO.high - TECHO.low) * vOf(x, z) / (BOQ.depth + BOQ.wall);
+    // Corre cada lado del polígono hacia afuera (over[i] por lado) y vuelve a cortar los lados entre sí
+    const offsetPoly = (q, over) => {
+      const li = q.map((a, i) => {
+        const b = q[(i + 1) % q.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+        let n = [-u[1], u[0]];
+        if ((a[0] - cen[0]) * n[0] + (a[1] - cen[1]) * n[1] < 0) n = [-n[0], -n[1]];
+        return { p: [a[0] + n[0] * over[i], a[1] + n[1] * over[i]], u };
+      });
+      return li.map((b, i) => {
+        const a = li[(i + li.length - 1) % li.length], det = a.u[0] * b.u[1] - a.u[1] * b.u[0];
+        if (Math.abs(det) < 1e-6) return b.p;
+        const k = ((b.p[0] - a.p[0]) * b.u[1] - (b.p[1] - a.p[1]) * b.u[0]) / det;
+        return [a.p[0] + a.u[0] * k, a.p[1] + a.u[1] * k];
+      });
+    };
+    const mid = i => { const a = poly[i], b = poly[(i + 1) % poly.length]; return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
+    // Sin vuelo sobre la colindancia derecha, para no pasar el techo al lote del vecino
+    const over = poly.map((q, i) => wOf(...mid(i)) > -0.05 ? 0 : LOSA.over);
+    const rgeo = new THREE.ExtrudeGeometry(shapeOf(offsetPoly(poly, over)), { depth: TECHO.thick, bevelEnabled: false });
+    rgeo.rotateX(-Math.PI / 2); scaleUV(rgeo, 1 / 0.19, 1);
+    const rp = rgeo.attributes.position;
+    for (let i = 0; i < rp.count; i++) rp.setY(i, rp.getY(i) + techoY(rp.getX(i), rp.getZ(i)));
+    rp.needsUpdate = true; rgeo.computeVertexNormals();
+    const cover = new THREE.Mesh(rgeo, [zinc, wood]);                              // la lámina arriba y la fascia de madera al canto
+    cover.castShadow = cover.receiveShadow = true; losaRoof.add(cover);
+    // Columnas de madera: en las esquinas de la losa y una a media orilla en los lados largos
+    const pull = (q, d) => { const L = Math.hypot(cen[0] - q[0], cen[1] - q[1]); return [q[0] + (cen[0] - q[0]) / L * d, q[1] + (cen[1] - q[1]) / L * d]; };
+    const posts = poly.map(q => pull(q, 0.24));
+    poly.forEach((q, i) => { if (Math.hypot(poly[(i + 1) % poly.length][0] - q[0], poly[(i + 1) % poly.length][1] - q[1]) > 4.5) posts.push(pull(mid(i), 0.24)); });
+    posts.forEach(([x, z]) => {
+      const top = techoY(x, z);
+      addBox(TECHO.post, top - losaY, TECHO.post, wood, x, (losaY + top) / 2, z, losaRoof).rotation.y = eYaw;
+    });
+
+    /* Baranda de madera en las tres orillas de afuera: al frente (caída a la calle), a la izquierda (caída al garaje) y sobre la
+       colindancia derecha. Al patio no lleva, porque por ahí se sube. Afuera cuelgan jardineras con las matas cayendo por la orilla */
+    const railing = (a, b, planters, seed) => {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]), u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], yaw = Math.atan2(-u[1], u[0]);
+      let n = [-u[1], u[0]];
+      if ((cen[0] - a[0]) * n[0] + (cen[1] - a[1]) * n[1] < 0) n = [-n[0], -n[1]];    // hacia adentro de la losa
+      const at = (d, off = 0.08) => [a[0] + u[0] * d + n[0] * off, a[1] + u[1] * d + n[1] * off];
+      const np = Math.max(2, Math.ceil(L / 1.5));
+      for (let i = 0; i <= np; i++) {
+        const [x, z] = at(L * i / np);
+        addBox(0.1, TECHO.rail, 0.1, wood, x, losaY + TECHO.rail / 2, z, losaRoof).rotation.y = yaw;
+      }
+      [[TECHO.rail - 0.03, 0.06, 0.12], [0.48, 0.05, 0.07]].forEach(([h, t, w]) => {
+        const [x, z] = at(L / 2);
+        addBox(L, t, w, wood, x, losaY + h, z, losaRoof).rotation.y = yaw;
+      });
+      const nb = Math.max(1, Math.round(L / 0.17));
+      for (let i = 1; i < nb; i++) {
+        const [x, z] = at(L * i / nb);
+        addBox(0.04, TECHO.rail - 0.12, 0.04, woodD, x, losaY + (TECHO.rail - 0.12) / 2 + 0.02, z, losaRoof).rotation.y = yaw;
+      }
+      if (!planters) return;
+      const r = rng(seed);
+      for (let i = 0, nj = Math.max(1, Math.round(L / 1.7)); i < nj; i++) {
+        const d = L * (i + 0.5) / nj, [x, z] = at(d, -0.13);                          // colgadas por fuera de la baranda
+        addBox(0.62, 0.24, 0.24, woodD, x, losaY + TECHO.rail - 0.22, z, losaRoof).rotation.y = yaw;
+        for (let k = 0; k < 6; k++) {
+          const rad = 0.09 + r() * 0.07, [px, pz] = at(d + (r() - .5) * 0.55, -0.13 + (r() - .5) * 0.14);
+          const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), leafMats[(r() * 4) | 0]);
+          m.position.set(px, losaY + TECHO.rail - 0.3 - r() * 0.55, pz); m.scale.y = 1.7;
+          m.castShadow = true; losaRoof.add(m);
+        }
+      }
+    };
+    poly.forEach((q, i) => {
+      const m = mid(i);
+      if (vOf(...m) > BOQ.depth + BOQ.wall - 0.05) return;                            // el lado del patio queda abierto
+      railing(q, poly[(i + 1) % poly.length], wOf(...m) < -0.05, 200 + i * 13);        // sin jardineras sobre la colindancia derecha
+    });
+  }
+
   // Tapia prefabricada en la colindancia 2-3, solo donde no está la casa vecina: de la calle a la casa (unas 2½ baldosas, dueña) y de
   // la casa al fondo. Como el lote de la izquierda queda casi a nivel de calle, la tapia hace de muro de contención: cada tramo
   // arranca del suelo más bajo y sube por lo menos 4 baldosas (TAPIA.h) y hasta 0.50 m sobre este lote. Sigue por el frente del
@@ -1308,8 +1510,6 @@
     tapiaRun([a[0] - cn[0] * off, a[1] - cn[1] * off], cu, [cn[0] * 0.5, cn[1] * 0.5], 0.15, 8.15);
   }
 
-  const leafMats = [0x4c7a3b, 0x5f8c46, 0x3f6a34, 0x6e9a52].map(c => std({ color: c, roughness: .9, flatShading: true }));
-  const bark = std({ color: 0x5b4332, roughness: 1 });
   function tree(x, z, sc, seed) {
     const r = rng(seed), g = new THREE.Group(); g.position.set(x, groundY(x, z) - 0.05, z); site.add(g);
     const th = 1.5 * sc, trunk = new THREE.Mesh(new THREE.CylinderGeometry(.09 * sc, .14 * sc, th, 7), bark);
@@ -1463,20 +1663,38 @@
   // Distancias de la casa al borde del lote: a la calle y al fondo por el lado derecho (sobre la colindancia 4-1) y por el izquierdo,
   // y al vecino de la izquierda a media casa. Del lado derecho el borde del techo queda sobre la línea. Con el boquete, la distancia a
   // la calle del lado derecho se parte en casa-muro y muro-calle (nowDims y boqDims, dentro de lotDims)
-  const nowDims = new THREE.Group(), boqDims = new THREE.Group(); lotDims.add(nowDims, boqDims);
-  const [xLeft] = cross(1), zAt = x => cross(0, x);
-  const xr = LOT[0][0] - 0.01 + W / 2, xl = -0.5, [zBackR, zFrontR] = zAt(X(xr)), [zBackL, zFrontL] = zAt(X(xl));   // xr: sobre la colindancia
-  dimLine(xr, D + 0.08, xr, zFrontR + D / 2, (zFrontR - Z(D + 0.08)).toFixed(2), nowDims);
-  const yWall = D + 0.08 + BOQ.gap;                                          // cara del muro del lado de la casa, en el plano
-  dimLine(xr, D + 0.08, xr, yWall, BOQ.gap.toFixed(2), boqDims);
-  dimLine(xr, yWall + BOQ.wall, xr, zFrontR + D / 2, (zFrontR - Z(yWall + BOQ.wall)).toFixed(2), boqDims);
+  const nowDims = new THREE.Group(), boqDims = new THREE.Group(), losaDims = new THREE.Group();
+  lotDims.add(nowDims, boqDims, losaDims);
+  const hNow = new THREE.Group(), hBoq = new THREE.Group(), hLot = new THREE.Group();
+  nowDims.add(hNow); boqDims.add(hBoq); lotDims.add(hLot);
+  const zAt = x => cross(0, x), xrW = LOT[0][0] - 0.01;                      // xrW: sobre la colindancia derecha
   addLabel('dim', 'Boquete a nivel de calle', new V3(boqMid[0], 0.06, boqMid[1])).grp = boqDims;
-  dimLine(xr, -0.06, xr, zBackR + D / 2, (Z(-0.06) - zBackR).toFixed(2), lotDims);
-  dimLine(xl, D + 0.06, xl, zFrontL + D / 2, (zFrontL - Z(D + 0.06)).toFixed(2), lotDims);
-  dimLine(xl, -0.06, xl, zBackL + D / 2, (Z(-0.06) - zBackL).toFixed(2), lotDims);
-  dimLine(-0.06, D / 2, xLeft + W / 2, D / 2, (X(-0.06) - xLeft).toFixed(2), lotDims);
-  $('#lot-gap').innerHTML = `${(X(-0.06) - xLeft).toFixed(2)}<small>m</small>`;
-  const zBack = Math.min(zBackR, zBackL);
+  // Corrida hacia la calle, para que no se encime con la del boquete, que va en el centro del piso de abajo
+  addLabel('dim', `Losa · ${LOSA.clear.toFixed(2)} m libres`,
+    new V3(losaMid[0] + cn[0] * 1.5, losaY + 0.06, losaMid[1] + cn[1] * 1.5)).grp = losaDims;
+  // Borra las medidas de un grupo, con sus etiquetas, para volver a dibujarlas
+  const clearDims = g => {
+    for (let i = labels.length - 1; i >= 0; i--) if (labels[i].grp === g) { labels[i].el.remove(); labels.splice(i, 1); }
+    while (g.children.length) g.children.pop().geometry.dispose();
+  };
+  // dx, dz: cuánto se corrió la casa en el mundo (cuadro Mover casa). El borde del lote no se mueve; la casa, sí
+  function houseDims(dx = 0, dz = 0) {
+    [hNow, hBoq, hLot].forEach(clearDims);
+    const xr = xrW + W / 2, xl = -0.5 + dx, yF = D + 0.08 + dz, yB = -0.06 + dz;
+    const [zBR, zFR] = zAt(xrW), [zBL, zFL] = zAt(X(xl));
+    dimLine(xr, yF, xr, zFR + D / 2, (zFR - Z(yF)).toFixed(2), hNow);
+    const yWall = D + 0.08 + BOQ.gap;                                        // cara del muro del boquete del lado del patio (fija)
+    dimLine(xr, yF, xr, yWall, (Z(yWall) - Z(yF)).toFixed(2), hBoq);
+    dimLine(xr, yWall + BOQ.wall, xr, zFR + D / 2, (zFR - Z(yWall + BOQ.wall)).toFixed(2), hBoq);
+    dimLine(xr, yB, xr, zBR + D / 2, (Z(yB) - zBR).toFixed(2), hLot);
+    dimLine(xl, D + 0.06 + dz, xl, zFL + D / 2, (zFL - Z(D + 0.06 + dz)).toFixed(2), hLot);
+    dimLine(xl, yB, xl, zBL + D / 2, (Z(yB) - zBL).toFixed(2), hLot);
+    const [xL] = cross(1, dz), gap = X(-0.06 + dx) - xL;                     // al vecino de la izquierda, a media casa
+    dimLine(-0.06 + dx, D / 2 + dz, xL + W / 2, D / 2 + dz, gap.toFixed(2), hLot);
+    $('#lot-gap').innerHTML = `${gap.toFixed(2)}<small>m</small>`;
+  }
+  houseDims();
+  const zBack = Math.min(zAt(xrW)[0], zAt(X(-0.5))[0]);
   lotLabel('dim', 'Lote · 212 m²', new V3(lotMid[0] + 2.3, 0.06, zBack + 1.6));
   lotLabel('dim', 'Calle pública', onGround(cm[0] + cn[0] * roadMid, cm[1] + cn[1] * roadMid, 0.06));
   // Flecha al norte, en el frente del lote vecino del este (entre la calle y su casa)
@@ -1489,7 +1707,7 @@
   lotLabel('dim', 'N', arrow.position.clone().addScaledVector(NORTH, 1.9));
 
   /* ---------- estado y controles ---------- */
-  const state = { roof: true, furn: true, names: true, dims: false, nb: true, boq: false, extra: false, view: 'exterior' };
+  const state = { roof: true, furn: true, names: true, dims: false, nb: true, boq: false, losa: false, techo: false, extra: false, view: 'exterior' };
   let selected = null;
   const syncNote = () => { $('#names-note').hidden = !(state.roof && state.names); };
   function setRoof(v) { state.roof = v; roof.visible = v; $('#t-roof').checked = v; syncNote(); }
@@ -1498,12 +1716,65 @@
   // Medidas: las de la casa en todas las vistas menos Lote, y las del lote solo en la vista Lote
   function setDims(v) { state.dims = v; dims.visible = v && state.view !== 'lote'; lotDims.visible = v && state.view === 'lote'; $('#t-dims').checked = v; }
   function setNb(v) { state.nb = v; neighbors.visible = v; $('#t-nb').checked = v; }
-  function setExtra(v) { state.extra = v; extra.visible = v; $('#t-extra').checked = v; }   // grada: se decide después
+  function setExtra(v) { state.extra = v; extra.visible = v; $('#t-extra').checked = v; }   // grada y plantas: se decide después
   // Boquete (proyecto): cambia el terreno y lo que depende de él entre hoy y con el boquete
   function setBoq(v) {
     state.boq = v; $('#t-boq').checked = v; setGround(v);
     today.visible = extraNow.visible = nowDims.visible = !v; boqG.visible = extraBoq.visible = boqDims.visible = v;
+    if (!v) setLosa(false);                                  // sin boquete no hay losa
+    fitHouse();                                              // con el boquete la casa no puede quedar sobre la excavación
   }
+  // Losa sobre el boquete y, encima de ella, el techo con su baranda y sus plantas: cada capa necesita la de abajo
+  function setLosa(v) {
+    state.losa = v; losaG.visible = losaDims.visible = v; $('#t-losa').checked = v;
+    if (v && !state.boq) setBoq(true); else if (!v) setTecho(false);
+  }
+  function setTecho(v) {
+    state.techo = v; losaRoof.visible = v; $('#t-techo').checked = v;
+    if (v && !state.losa) setLosa(true);
+  }
+
+  /* Mover la casa dentro del lote (cuadro Mover casa). Corre la casa, el techo, los muebles, sus medidas y la piedrilla del frente;
+     las gradas del patio a la losa se corren solo de lado. front: metros hacia el fondo, negativo hacia la calle; side: metros hacia
+     la izquierda, separándose del vecino de la derecha. La casa se topa donde el filo de afuera del techo llegaría a una línea del
+     lote o al corte del fondo, y por delante en el muro del boquete o, sin boquete, en el borde del talud */
+  const MOVE = { front: 0, side: 0 }, houseOff = new V3();
+  const RX = W / 2 + OVS + 0.05, RZ = D / 2 + OVF;                            // medio ancho y medio fondo del filo del techo
+  const moveVec = (f, s) => [bu[0] * f - bw[0] * s, bu[1] * f - bw[1] * s];
+  const fitsAt = (f, s) => {
+    const [dx, dz] = moveVec(f, s);
+    return [[-RX, -RZ], [RX, -RZ], [-RX, RZ], [RX, RZ]].every(([x, z]) => {
+      const px = x + dx, pz = z + dz;
+      if (wOf(px, pz) > 0 || eOf(px, pz) > 0 || sBack(px, pz) > -0.2) return false;
+      return state.boq ? vOf(px, pz) >= BOQ.depth + BOQ.wall : sIn(px, pz) >= GROUND.talud;
+    });
+  };
+  // Se acerca lo más que puede a (f, s) sin salirse, partiendo de donde está la casa (o del sitio original, si ahí ya no cabe)
+  function setMove(f, s) {
+    const a = fitsAt(MOVE.front, MOVE.side) ? [MOVE.front, MOVE.side] : [0, 0];
+    if (!fitsAt(f, s)) {
+      let lo = 0, hi = 1;
+      for (let i = 0; i < 20; i++) {
+        const k = (lo + hi) / 2;
+        if (fitsAt(a[0] + (f - a[0]) * k, a[1] + (s - a[1]) * k)) lo = k; else hi = k;
+      }
+      f = a[0] + (f - a[0]) * lo; s = a[1] + (s - a[1]) * lo;
+    }
+    MOVE.front = f; MOVE.side = s;
+    const [dx, dz] = moveVec(f, s);
+    houseOff.set(dx, 0, dz);
+    [house, roof, furn, dims, frontPad].forEach(g => g.position.set(dx, 0, dz));
+    const sl = Math.max(0, Math.min(s, stepRoom));                            // las gradas de la losa, sin salirse de ella
+    losaSteps.position.set(-bw[0] * sl, 0, -bw[1] * sl);
+    houseDims(dx, dz);
+    $('#mv-front').value = f; $('#mv-side').value = s;
+    $('#mv-front-out').textContent = `${f.toFixed(2)} m`;
+    $('#mv-side-out').textContent = `${s.toFixed(2)} m`;
+  }
+  function fitHouse() { setMove(MOVE.front, MOVE.side); }
+  $('#mv-front').addEventListener('input', e => setMove(parseFloat(e.target.value), MOVE.side));
+  $('#mv-side').addEventListener('input', e => setMove(MOVE.front, parseFloat(e.target.value)));
+  $('#mv-reset').addEventListener('click', () => setMove(0, 0));
   $('#t-roof').addEventListener('change', e => setRoof(e.target.checked));
   $('#t-furn').addEventListener('change', e => setFurn(e.target.checked));
   $('#t-names').addEventListener('change', e => setNames(e.target.checked));
@@ -1511,6 +1782,8 @@
   $('#t-nb').addEventListener('change', e => setNb(e.target.checked));
   $('#t-extra').addEventListener('change', e => setExtra(e.target.checked));
   $('#t-boq').addEventListener('change', e => setBoq(e.target.checked));
+  $('#t-losa').addEventListener('change', e => setLosa(e.target.checked));
+  $('#t-techo').addEventListener('change', e => setTecho(e.target.checked));
   $('#hour').addEventListener('input', e => applyHour(parseFloat(e.target.value)));
 
   // Colores: cada grupo pinta un material. El primer color de cada lista es el de las fotos
@@ -1565,7 +1838,7 @@
     if (id && fly) {
       const r = ROOMS.find(q => q.id === id), [x0, x1, y0, y1] = r.rect;
       if (state.roof) setRoof(false);
-      const t = new V3(X((x0 + x1) / 2), FL, Z((y0 + y1) / 2));
+      const t = new V3(X((x0 + x1) / 2), FL, Z((y0 + y1) / 2)).add(houseOff);
       const off = new V3(3.2, 8.5, 6.2); if (camera.aspect < 1.25) off.multiplyScalar(Math.min(2.2, 1.25 / camera.aspect));
       flyTo(t.clone().add(off), t);
     }
@@ -1583,6 +1856,7 @@
   };
   function viewPose(name) {
     const v = VIEWS[name], t = new V3(...v.t), p = new V3(...v.p), a = camera.aspect;
+    if (name !== 'lote') { t.add(houseOff); p.add(houseOff); }               // las vistas de la casa la siguen si se movió
     if (a < 1.25) p.sub(t).multiplyScalar(Math.min(2.3, 1.25 / a)).add(t);
     if (window.innerWidth > 800) { const [dx, dz] = v.pan || [-1.2, 0]; p.x += dx; t.x += dx; p.z += dz; t.z += dz; }
     return { p, t };
@@ -1645,7 +1919,7 @@
     controls.target.copy(start.t);
     flyTo(start.p, start.t);
   }
-  setRoof(true); setFurn(true); setNames(true); setDims(false); setNb(true); setBoq(false); setExtra(false);
+  setRoof(true); setFurn(true); setNames(true); setDims(false); setNb(true); setBoq(false); setLosa(false); setTecho(false); setExtra(false);
   applyHour(10);
 
   const v = new V3();
@@ -1654,7 +1928,8 @@
     const w = canvas.clientWidth, h = canvas.clientHeight;
     for (const L of labels) {
       const show = L.kind === 'room' ? (state.names && !state.roof) : shown(L.grp);
-      if (show) { v.copy(L.pos).project(camera); }
+      // Las etiquetas de la casa y de sus medidas se corren con ella
+      if (show) { v.copy(L.pos); if (L.kind === 'room' || L.grp === dims) v.add(houseOff); v.project(camera); }
       if (!show || v.z > 1) { if (!L.el.hidden) L.el.hidden = true; continue; }
       L.el.hidden = false;
       L.el.style.transform = `translate(${((v.x * .5 + .5) * w).toFixed(1)}px,${((-v.y * .5 + .5) * h).toFixed(1)}px) translate(-50%,-50%)`;
