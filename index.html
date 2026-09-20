@@ -184,7 +184,7 @@
     <div class="extra"><dt>Columnas</dt><dd>31<small>de 3.20 m</small></dd></div>
     <div class="extra"><dt>Lote</dt><dd>212<small>m²</small></dd></div>
     <div class="extra"><dt>Frente lote</dt><dd>7.98<small>m</small></dd></div>
-    <div class="extra"><dt>Al vecino</dt><dd id="lot-gap">1.45<small>m</small></dd></div>
+    <div class="extra"><dt>Al vecino</dt><dd id="lot-gap">2.50<small>m</small></dd></div>
   </dl>
   <details class="spaces" id="spaces" open>
     <summary><span class="sec-h">Espacios</span><span class="sum-note">medidas a ejes</span><i class="chev"></i></summary>
@@ -211,6 +211,8 @@
           <label class="tog"><input type="checkbox" id="t-names" checked><span class="box"></span>Nombres</label>
           <label class="tog"><input type="checkbox" id="t-dims"><span class="box"></span>Medidas</label>
           <label class="tog"><input type="checkbox" id="t-nb" checked><span class="box"></span>Vecinos</label>
+          <label class="tog"><input type="checkbox" id="t-boq"><span class="box"></span>Boquete</label>
+          <label class="tog"><input type="checkbox" id="t-extra"><span class="box"></span>Grada</label>
         </div>
         <p class="note" id="names-note">Los nombres de los espacios se ven al quitar el techo.</p>
       </fieldset>
@@ -319,6 +321,24 @@
     speckle(g, w, h, r, 2500, ['rgba(0,0,0,.07)', 'rgba(0,0,0,.035)', 'rgba(255,255,255,.4)'], [1, 3]);
     g.fillStyle = 'rgba(40,35,30,.4)'; g.fillRect(0, 0, w, 2);
   }, 11);
+  // Bloque de concreto de 0.40 × 0.20 en petatillo: la textura cubre dos bloques de largo y dos hiladas (0.80 × 0.40 m)
+  const T_block = tex(256, 128, (g, w, h, r) => {
+    g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, r, 4200, ['rgba(0,0,0,.12)', 'rgba(0,0,0,.06)', 'rgba(255,255,255,.45)'], [1, 2]);
+    g.fillStyle = 'rgba(35,35,35,.55)';
+    g.fillRect(0, 0, w, 3); g.fillRect(0, h / 2 - 1.5, w, 3);
+    [0, w / 2].forEach(x => g.fillRect(x, 0, 3, h / 2));
+    [w / 4, 3 * w / 4].forEach(x => g.fillRect(x - 1.5, h / 2, 3, h / 2));
+  }, 12);
+  // Asfalto gastado, con parches (fotos de la calle)
+  const T_asphalt = tex(256, 256, (g, w, h, r) => {
+    g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle = `rgba(0,0,0,${.025 + r() * .03})`;
+      g.beginPath(); g.ellipse(r() * w, r() * h, 25 + r() * 40, 18 + r() * 25, r() * 3, 0, 6.3); g.fill();
+    }
+    speckle(g, w, h, r, 7000, ['rgba(0,0,0,.1)', 'rgba(0,0,0,.05)', 'rgba(255,255,255,.35)'], [1, 2]);
+  }, 13);
   const T_gravel = tex(256, 256, (g, w, h, r) => {
     g.fillStyle = '#6f6a64'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 2600; i++) { const v = 95 + (r() * 120 | 0); g.fillStyle = `rgb(${v},${v - 3},${v - 7})`; g.beginPath(); g.ellipse(r() * w, r() * h, 1 + r() * 2.6, 1 + r() * 2, r() * 3, 0, 6.3); g.fill(); }
@@ -408,6 +428,7 @@
   const site = new THREE.Group(); scene.add(site);
   const neighbors = new THREE.Group(); scene.add(neighbors);
   const lotDims = new THREE.Group(); scene.add(lotDims);   // medidas del lote: solo en la vista Lote
+  const extra = new THREE.Group(); scene.add(extra);       // ideas para después (la grada): capa aparte, apagada al abrir
 
   function addBox(w, h, d, mat, x, y, z, parent = house) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -772,25 +793,30 @@
   fbox(4.19, 4.27, -0.05, -0.04, 1.2, 1.32, COL.white);                     // apagador
 
   /* ---------- terreno ---------- */
-  const flat = (geo, material, y, order) => {
+  const flat = (geo, material, y, order, parent = site) => {
     geo.rotateX(-Math.PI / 2);
     const m = new THREE.Mesh(geo, material); m.position.y = y; m.receiveShadow = true;
     material.polygonOffset = true; material.polygonOffsetFactor = -order; material.polygonOffsetUnits = -order;
-    site.add(m); return m;
+    parent.add(m); return m;
   };
-  flat(scaleUV(new THREE.CircleGeometry(160, 64), 80, 80), std({ map: T_grass, roughness: 1 }), 0, 0);
+  // Estado de hoy y proyecto del boquete (capa Boquete): lo que cambia entre los dos va en today o en boqG. setGround cambia la malla
+  const today = new THREE.Group(); site.add(today);
+  const boqG = new THREE.Group(); site.add(boqG);
+  let setGround = () => {}, boqMid = [0, 0];
+  // El terreno con el desnivel (calle, talud, rampa del vecino y corte del fondo) se arma en la sección lote, porque sale del plano catastrado
 
   /* ---------- lote (plano catastrado, 212 m²) ---------- */
   // Derrotero del plano: azimut (grados, minutos, segundos) y distancia en metros. La línea 1-2 es el frente a la calle pública
   const DERROTERO = [[[61, 23, 6], 7.98], [[164, 58, 14], 23.09], [[236, 57, 6], 10.87], [[350, 57, 13], 24.71]];
   const azRad = ([d, m, sec]) => (d + m / 60 + sec / 3600) * Math.PI / 180;
-  const survey = [[0, 0]];                                  // [este, norte] de los vértices 1 a 4 (el polígono cierra con 5 mm)
+  const survey = [[0, 0]];                                  // [este, norte] de los vértices 1 a 4 (el polígono cierra con 3 mm)
   DERROTERO.slice(0, 3).forEach(([az, dist]) => {
     const [e, n] = survey[survey.length - 1];
     survey.push([e + Math.sin(azRad(az)) * dist, n + Math.cos(azRad(az)) * dist]);
   });
-  // La casa va alineada con las colindancias laterales: su frente (+Z) mira hacia la bisectriz de las líneas 4-1 y 3-2
-  const AXIS = (azRad(DERROTERO[3][0]) + azRad(DERROTERO[1][0]) + Math.PI) / 2;
+  // La casa va paralela a la colindancia 4-1 (pedido de la dueña, 2026-09-19: pegada al vecino de la derecha): su frente (+Z) mira
+  // en la dirección de 4 hacia 1
+  const AXIS = azRad(DERROTERO[3][0]);
   const azDir = az => new V3(-Math.sin(az - AXIS), 0, Math.cos(az - AXIS));   // un azimut en el mundo; el este queda hacia −X
   let LOT = survey.map(([e, n]) => [-(e * Math.cos(AXIS) - n * Math.sin(AXIS)), e * Math.sin(AXIS) + n * Math.cos(AXIS)]); // [x, z]
   // Cortes del borde del lote con la recta x = at (k = 0, devuelve las z) o z = at (k = 1, devuelve las x)
@@ -802,24 +828,186 @@
     });
     return [Math.min(...hits), Math.max(...hits)];
   };
-  // Casa al centro: misma distancia a la calle y al fondo sobre el eje de la casa, y a los dos vecinos a media casa
-  for (let i = 0; i < 40; i++) {
-    const [z0, z1] = cross(0), [x0, x1] = cross(1);
-    LOT = LOT.map(([x, z]) => [x - (x0 + x1) / 2, z - (z0 + z1) / 2]);
+  /* Ubicación de la casa (pedido de la dueña, 2026-09-19): pegada al límite derecho visto desde la calle (colindancia 4-1) y lo más
+     adelante posible, dejando al frente solo el boquete para un garaje a nivel de calle (capa Boquete, proyecto).
+     - side: separación de la colindancia al filo de afuera de nuestro techo (la canoa). Con 0.15 m la pared queda 0.31 m adentro,
+       nada del techo pasa al lote vecino y el alero del vecino, que sí se mete 0.50 m, no alcanza nuestro techo (ver README).
+     - BOQ, medido a lo largo de la colindancia 4-1 desde la calle: depth, fondo libre del boquete del lado derecho, que es el más
+       corto porque la calle va sesgada (la dueña midió un garaje de 4.50 m donde un carro cabía bien); wall, grueso del muro de
+       contención de atrás; gap, del muro al frente de la casa, para el talón del muro, el desagüe y conectar después la losa.
+       fall: pendiente del piso del boquete hacia la calle, para que escurra.
+     - front: del vértice 1 al frente de la casa (borde de la losa del corredor), a lo largo de la colindancia 4-1 */
+  const BOQ = { depth: 5.0, wall: 0.2, gap: 1.0, fall: 0.015 };
+  const SITE = { front: BOQ.depth + BOQ.wall + BOQ.gap, side: 0.15 };
+  {
+    const dx = W / 2 + OVS + 0.05 + SITE.side - LOT[0][0], dz = Z(D + 0.08) + SITE.front - LOT[0][1];
+    LOT = LOT.map(([x, z]) => [x + dx, z + dz]);
   }
-  flat(scaleUV(new THREE.ShapeGeometry(new THREE.Shape(LOT.map(([x, z]) => new THREE.Vector2(x, -z)))), 1 / 3, 1 / 3),
-    std({ map: T_earth, color: 0xd9c3b6, roughness: 1 }), 0.01, 1);
-  // Línea roja sobre el borde exacto del lote y un mojón en cada vértice
+  // Línea de la calle (1-2): dirección cu del vértice 1 al 2 (hacia el este) y normal cn hacia afuera del lote
+  const c1 = LOT[0], c2 = LOT[1], cl = Math.hypot(c2[0] - c1[0], c2[1] - c1[1]);
+  const cu = [(c2[0] - c1[0]) / cl, (c2[1] - c1[1]) / cl], cm = [(c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2];
+  let cn = [-cu[1], cu[0]]; if (cn[0] * cm[0] + cn[1] * cm[1] < 0) cn = [-cn[0], -cn[1]];   // hacia afuera del lote
+
+  /* Desnivel (fotos del 2026-09-19). El lote no está a nivel de calle: es una terraza plana (y = 0) sobre la calle.
+     - En el vértice 1 la terraza queda 1.60 m sobre la calle: el muro de bloques del vecino de la derecha tiene ahí 8 hiladas de 0.20.
+     - La calle es de asfalto y baja hacia el este (grade, supuesto), así que el talud del frente crece de 1.60 a unos 2.0 m.
+     - El talud del frente sube desde el borde de la calle hasta la terraza en 2.50 m (supuesto, medido a ojo en las fotos).
+     - Al fondo, sobre la línea 3-4, hay un corte de tierra y detrás sigue subiendo el cerro con cafetal y árboles (top, hill).
+     - El lote de la izquierda (al este) está casi a nivel de calle (dueña): eastLot. La tapia de la colindancia 2-3 hace de muro.
+     - El vecino de la derecha bajó una rampa de concreto desde la calle hasta su casa, con un muro de bloques en L (RAMP). */
+  const GROUND = { street: -1.6, grade: 0.05, talud: 2.5, top: 2.4, cutRun: 0.6, hill: 0.2, eastLot: -1.9 };
+  const streetY = t => GROUND.street - GROUND.grade * Math.max(-45, Math.min(45, t));        // t: metros desde el vértice 1 hacia el este
+  const terraceY = t => t < -20 ? streetY(t) - streetY(-20) : t > 25 ? streetY(t) - streetY(25) : 0;  // lejos, la terraza sigue a la calle
+  const eastY = t => Math.min(GROUND.eastLot, streetY(t) + 0.3);                           // lote de la izquierda, un poco sobre la calle
+  const sIn = (x, z) => -((x - c1[0]) * cn[0] + (z - c1[1]) * cn[1]);                      // metros desde el borde de la calle hacia adentro
+  const tAl = (x, z) => (x - c1[0]) * cu[0] + (z - c1[1]) * cu[1];
+  // Fondo (línea 3-4, que el lote vecino continúa): sBack > 0 detrás del lote
+  const bl = Math.hypot(LOT[2][0] - LOT[3][0], LOT[2][1] - LOT[3][1]);
+  let bn = [-(LOT[2][1] - LOT[3][1]) / bl, (LOT[2][0] - LOT[3][0]) / bl];
+  if (-LOT[3][0] * bn[0] - LOT[3][1] * bn[1] > 0) bn = [-bn[0], -bn[1]];
+  const sBack = (x, z) => (x - LOT[3][0]) * bn[0] + (z - LOT[3][1]) * bn[1];
+  // Colindancia 4-1: bu va del vértice 1 al 4 (hacia el fondo) y bw hacia el lote vecino de la derecha (oeste)
+  const L41 = Math.hypot(LOT[3][0] - c1[0], LOT[3][1] - c1[1]), bu = [(LOT[3][0] - c1[0]) / L41, (LOT[3][1] - c1[1]) / L41];
+  let bw = [-bu[1], bu[0]]; if (-c1[0] * bw[0] - c1[1] * bw[1] > 0) bw = [-bw[0], -bw[1]];
+  const wOf = (x, z) => (x - c1[0]) * bw[0] + (z - c1[1]) * bw[1];                         // metros al oeste de la colindancia 4-1
+  // Colindancia 2-3: eOf > 0 del lado del lote de la izquierda (este)
+  const L23 = Math.hypot(LOT[2][0] - LOT[1][0], LOT[2][1] - LOT[1][1]);
+  let be = [-(LOT[2][1] - LOT[1][1]) / L23, (LOT[2][0] - LOT[1][0]) / L23];
+  if (-LOT[1][0] * be[0] - LOT[1][1] * be[1] > 0) be = [-be[0], -be[1]];
+  const eOf = (x, z) => (x - LOT[1][0]) * be[0] + (z - LOT[1][1]) * be[1];
+
+  /* Casa del vecino de la derecha: medidas por fuera sacadas de las fotos y de la vista satelital (unos ±0.5 m); ver la sección de
+     la casa más abajo. Está torcida con la colindancia 4-1 (rot): el frente se abre hacia su lote y atrás se acerca a la línea.
+     at: [metros al oeste de la colindancia, metros desde el vértice 1 a lo largo de ella] del centro del borde este de su techo,
+     medido en la vista satelital. Con rot, la esquina de atrás del techo se mete 0.50 m en este lote, como dice la dueña.
+     Marco propio: u a lo ancho (de la cara este a la oeste) y v de su frente hacia atrás */
+  const YH = { w: 6.0, d: 9.45, bay: 1.35, fl: 0.15, h: 2.5, ovf: 0.48, ovs: 0.15, rise: 1.1, rot: 6.5, at: [0.1, 13.1], shed: 5.0 };
+  const yRot = YH.rot * Math.PI / 180;
+  const hv = [bu[0] * Math.cos(yRot) - bw[0] * Math.sin(yRot), bu[1] * Math.cos(yRot) - bw[1] * Math.sin(yRot)];
+  const hu = [bw[0] * Math.cos(yRot) + bu[0] * Math.sin(yRot), bw[1] * Math.cos(yRot) + bu[1] * Math.sin(yRot)];
+  const yMid = YH.d / 2, yAt = [c1[0] + bu[0] * YH.at[1] + bw[0] * YH.at[0], c1[1] + bu[1] * YH.at[1] + bw[1] * YH.at[0]];
+  const P0 = [yAt[0] + hu[0] * YH.ovs - hv[0] * yMid, yAt[1] + hu[1] * YH.ovs - hv[1] * yMid];
+  // Rampa del vecino y su muro de bloques en L (fotos y dueña): un tramo de unos 8 bloques (3.20 m) frente a la calle, desde la
+  // colindancia, y otro a lo largo de la entrada, más o menos alineado con la casa, que termina 0.40 m al este de su esquina.
+  // Detrás del muro queda una franja de su lote a nivel de terraza. La rampa va del muro al borde oeste (westU en el frente de la
+  // casa, `width` en la calle), sube de la calle y llega a la terraza `landing` metros antes de la casa; del lado oeste la tierra
+  // baja a la rampa en talud (side). E: cara oeste del muro; W: borde oeste de la rampa
+  const RAMP = { streetLen: 3.2, houseGap: 0.4, width: 3.2, westU: 3.6, landing: 0.5, wall: 0.15, side: 1.0 };
+  const onStreet = t => [c1[0] + cu[0] * t, c1[1] + cu[1] * t];
+  const atHouse = u => [P0[0] + hu[0] * u - hv[0] * 0.2, P0[1] + hu[1] * u - hv[1] * 0.2];
+  const lineSide = (p, q, ref) => {                                         // distancia con signo a la recta pq, positiva del lado de ref
+    const l = Math.hypot(q[0] - p[0], q[1] - p[1]); let n = [-(q[1] - p[1]) / l, (q[0] - p[0]) / l];
+    if ((ref[0] - p[0]) * n[0] + (ref[1] - p[1]) * n[1] < 0) n = [-n[0], -n[1]];
+    return (x, z) => (x - p[0]) * n[0] + (z - p[1]) * n[1];
+  };
+  const Es = onStreet(-RAMP.streetLen), Eh = atHouse(-RAMP.houseGap);
+  const Ws = onStreet(-(RAMP.streetLen + RAMP.width)), Wh = atHouse(RAMP.westU);
+  const dE = lineSide(Es, Eh, Ws), dW = lineSide(Ws, Wh, [2 * Ws[0] - Es[0], 2 * Ws[1] - Es[1]]);   // dE > 0 hacia la rampa; dW > 0 afuera
+  const rampEnd = (sIn(...Eh) + sIn(...Wh)) / 2 - RAMP.landing;
+  function groundY(x, z) {
+    const s = sIn(x, z), t = tAl(x, z), st = streetY(t), b = sBack(x, z);
+    // El escalón de cada muro cae dentro del muro o del lado que tapa otra superficie (la tierra del lote o la franja del vecino)
+    const ty = eOf(x, z) > 0.03 ? eastY(t) : terraceY(t);
+    if (b > 1e-6) return ty + (GROUND.top - ty) * Math.min(1, b / GROUND.cutRun) + Math.min(14, GROUND.hill * Math.max(0, b - GROUND.cutRun));
+    let y = s <= 1e-6 ? st : s < GROUND.talud ? st + (ty - st) * s / GROUND.talud : ty;
+    if (wOf(x, z) > 1e-6 && s > 1e-6) {       // los puntos justo sobre una línea del lote quedan del lado de afuera
+      const e = dE(x, z);
+      if (e <= -0.36) y = ty;                                                               // franja detrás del muro en L
+      else if (s < rampEnd) y = Math.min(y, st + (ty - st) * s / rampEnd + Math.max(0, dW(x, z)) * RAMP.side);
+    }
+    return y;
+  }
+  /* Boquete (proyecto): todo el frente del lote, de lindero a lindero, se excava hasta el nivel de la calle, desde la calle hasta un
+     muro de contención paralelo al frente de la casa (BOQ.depth del lado derecho). groundY es el terreno de hoy; boqY, con el boquete.
+     vOf: metros desde el vértice 1 a lo largo de la colindancia 4-1 */
+  const vOf = (x, z) => (x - c1[0]) * bu[0] + (z - c1[1]) * bu[1];
+  const floorY = (x, z) => streetY(tAl(x, z)) + BOQ.fall * Math.max(0, sIn(x, z));
+  // Del lado izquierdo usa el mismo corte que groundY (0.03 pasado el lindero), para que no quede una orilla al nivel del patio
+  const inBoq = (x, z) => sIn(x, z) > 1e-6 && wOf(x, z) <= 1e-6 && eOf(x, z) <= 0.03 && vOf(x, z) < BOQ.depth;
+  const boqY = (x, z) => inBoq(x, z) ? floorY(x, z) : groundY(x, z);
+  // Para la malla del terreno con el boquete: se hunde 0.30 bajo el piso del boquete, un poco pasado el muro de atrás (queda bajo la
+  // tierra del lote) y hasta 0.40 del lado del vecino de la derecha (queda bajo su franja). Así el escalón no asoma frente a los muros
+  const boqMeshY = (x, z) => {
+    const s = sIn(x, z), w = wOf(x, z);
+    const low = s > 1e-6 && eOf(x, z) <= 0.03 && w <= (s > RAMP.wall + 0.05 ? 0.4 : 1e-6) && vOf(x, z) < BOQ.depth + BOQ.wall + 0.45;
+    return low ? floorY(x, z) - 0.3 : groundY(x, z);
+  };
+  // Malla del terreno alineada con la calle: fina (0.25 m) cerca de los lotes y gruesa lejos. Zacate, y tierra en la cara del corte
+  const ticks = (lo, a, b, hi, fine, coarse) => {
+    const v = [];
+    for (let x = lo; x < a - 1e-6; x += coarse) v.push(x);
+    for (let i = 0; a + i * fine <= b + 1e-6; i++) v.push(a + i * fine);
+    for (let x = b + coarse; x <= hi + 1e-6; x += coarse) v.push(x);
+    return v;
+  };
+  {
+    const TT = ticks(-120, -24, 26, 120, 0.25, 4), SS = ticks(-100, -8, 34, 120, 0.25, 4), nt = TT.length;
+    const pos = [], uv = [], grass = [], earth = [], up = cn[0] * cu[1] - cn[1] * cu[0] > 0, yNow = [], yBoq = [];
+    SS.forEach(s => TT.forEach(t => {
+      const x = c1[0] + cu[0] * t - cn[0] * s, z = c1[1] + cu[1] * t - cn[1] * s;
+      yNow.push(groundY(x, z)); yBoq.push(boqMeshY(x, z));
+      pos.push(x, yNow[yNow.length - 1], z); uv.push(x / 4, z / 4);
+    }));
+    for (let j = 0; j < SS.length - 1; j++) for (let i = 0; i < nt - 1; i++) {
+      const a = j * nt + i, b = a + 1, c = a + nt, d = c + 1;
+      const bb = sBack((pos[3 * a] + pos[3 * d]) / 2, (pos[3 * a + 2] + pos[3 * d + 2]) / 2);
+      const dst = bb > -0.15 && bb < GROUND.cutRun + 0.25 && Math.abs(TT[i]) < 45 ? earth : grass;
+      if (up) dst.push(a, c, b, b, c, d); else dst.push(a, b, c, b, d, c);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(grass.concat(earth)); geo.addGroup(0, grass.length, 0); geo.addGroup(grass.length, earth.length, 1);
+    geo.computeVertexNormals();
+    const ground = new THREE.Mesh(geo, [std({ map: T_grass, roughness: 1 }), std({ map: T_earth, color: 0xc9a08c, roughness: 1 })]);
+    ground.receiveShadow = true; ground.userData.noPick = true; site.add(ground);
+    // La capa Boquete cambia las alturas de la misma malla: hoy (yNow) o con el boquete (yBoq)
+    setGround = on => {
+      const a = geo.attributes.position, ys = on ? yBoq : yNow;
+      for (let i = 0; i < a.count; i++) a.setY(i, ys[i]);
+      a.needsUpdate = true; geo.computeVertexNormals();
+    };
+  }
+  // Tierra del lote solo sobre la terraza: hoy, el talud del frente queda con zacate, como en las fotos; con el boquete, hasta el muro
+  const clipIn = (poly, f) => {
+    const out = [];
+    poly.forEach((p, i) => {
+      const q = poly[(i + 1) % poly.length], fp = f(p), fq = f(q);
+      if (fp >= 0) out.push(p);
+      if ((fp >= 0) !== (fq >= 0)) { const k = fp / (fp - fq); out.push([p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k]); }
+    });
+    return out;
+  };
+  const lotEarth = std({ map: T_earth, color: 0xd9c3b6, roughness: 1 });
+  const earthFlat = (f, parent) => flat(scaleUV(new THREE.ShapeGeometry(new THREE.Shape(clipIn(LOT, f).map(([x, z]) => new THREE.Vector2(x, -z)))), 1 / 3, 1 / 3),
+    lotEarth, 0.01, 1, parent);
+  earthFlat(([x, z]) => sIn(x, z) - GROUND.talud, today);
+  earthFlat(([x, z]) => vOf(x, z) - BOQ.depth - BOQ.wall, boqG);
+  // Línea roja sobre el borde exacto del lote y un mojón en cada vértice. La línea sigue el terreno (baja por el talud)
   const lotRed = new THREE.MeshBasicMaterial({ color: 0xE0241B });
-  const lotEdge = (p, q, material, w) => {
-    const len = Math.hypot(q[0] - p[0], q[1] - p[1]), seg = new THREE.Mesh(new THREE.BoxGeometry(w, w / 2, len + w), material);
-    seg.position.set((p[0] + q[0]) / 2, 0.025 + w / 4, (p[1] + q[1]) / 2); seg.rotation.y = Math.atan2(q[0] - p[0], q[1] - p[1]); site.add(seg);
+  // Donde la línea cae en un escalón (muro del vecino, tapia), va por el lado más alto, así no se esconde en el terreno
+  const lotEdge = (p, q, material, w, parent = site, yOf = groundY) => {
+    const len = Math.hypot(q[0] - p[0], q[1] - p[1]), n = Math.max(1, Math.ceil(len / 0.25));
+    const ox = -(q[1] - p[1]) / len * 0.12, oz = (q[0] - p[0]) / len * 0.12;
+    const at = k => {
+      const x = p[0] + (q[0] - p[0]) * k, z = p[1] + (q[1] - p[1]) * k;
+      return new V3(x, Math.max(yOf(x, z), yOf(x + ox, z + oz), yOf(x - ox, z - oz)) + 0.025 + w / 4, z);
+    };
+    for (let i = 0; i < n; i++) {
+      const a = at(i / n), b = at((i + 1) / n), seg = new THREE.Mesh(new THREE.BoxGeometry(w, w / 2, a.distanceTo(b) + w / 2), material);
+      seg.position.copy(a).add(b).multiplyScalar(0.5); seg.lookAt(b); parent.add(seg);
+    }
   };
   const mojon = (p, material, r) => {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.35, 10), material);
-    post.position.set(p[0], 0.175, p[1]); site.add(post);
+    post.position.set(p[0], groundY(p[0], p[1]) + 0.175, p[1]); site.add(post);
   };
-  LOT.forEach((pt, i) => { lotEdge(pt, LOT[(i + 1) % 4], lotRed, 0.08); mojon(pt, lotRed, 0.05); });
+  // La línea 2-3 baja con el boquete; las otras quedan igual en los dos estados
+  LOT.forEach((pt, i) => {
+    if (i === 1) { lotEdge(pt, LOT[2], lotRed, 0.08, today); lotEdge(pt, LOT[2], lotRed, 0.08, boqG, boqY); }
+    else lotEdge(pt, LOT[(i + 1) % 4], lotRed, 0.08);
+    mojon(pt, lotRed, 0.05);
+  });
 
   // Lote de la derecha visto desde la calle (al oeste), de su propio plano catastrado (219 m²). Su línea 2-3 es la 4-1 de este lote
   // al revés (24.71 m), así que su vértice 2 es nuestro 1 y su 3 es nuestro 4. Los otros dos salen de su derrotero: el polígono
@@ -831,27 +1019,60 @@
   [0, 2, 3].forEach(i => lotEdge(LOT_DER[i], LOT_DER[(i + 1) % 4], lotAmber, 0.07));   // la línea compartida queda roja
   [0, 3].forEach(i => mojon(LOT_DER[i], lotAmber, 0.045));
 
-  // Calle pública: derecho de vía de 11.08 m frente a la línea 1-2 (plano). La carretera de lastre de 6 m arranca al ras del lote (dueña)
-  const c1 = LOT[0], c2 = LOT[1], cl = Math.hypot(c2[0] - c1[0], c2[1] - c1[1]);
-  const cu = [(c2[0] - c1[0]) / cl, (c2[1] - c1[1]) / cl], cm = [(c1[0] + c2[0]) / 2, (c1[1] + c2[1]) / 2];
-  let cn = [-cu[1], cu[0]]; if (cn[0] * cm[0] + cn[1] * cm[1] < 0) cn = [-cn[0], -cn[1]];   // hacia afuera del lote
+  // Calle pública: derecho de vía de 11.08 m frente a la línea 1-2 (plano). La carretera arranca al ras del lote (dueña) y en las
+  // fotos es de asfalto. Ancho de 6 m (supuesto). Sigue la pendiente de la calle (streetY)
   const ROAD_W = 6, roadMid = ROAD_W / 2;                                   // del borde del lote hacia afuera
-  const road = flat(scaleUV(new THREE.PlaneGeometry(90, ROAD_W), 90 / 1.5, ROAD_W / 1.5), std({ map: T_gravel, color: 0xa8a197, roughness: 1 }), 0.015, 1);
-  road.position.set(cm[0] + cn[0] * roadMid, 0.015, cm[1] + cn[1] * roadMid); road.rotation.y = Math.atan2(-cu[1], cu[0]);
+  const drape = (geo, lift) => {                                             // pega una geometría (en coordenadas del mundo) al terreno
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setY(i, groundY(p.getX(i), p.getZ(i)) + lift);
+    p.needsUpdate = true; geo.computeVertexNormals(); return geo;
+  };
+  const roadGeo = scaleUV(new THREE.PlaneGeometry(90, ROAD_W, 90, 2), 90 / 5, ROAD_W / 5);
+  roadGeo.rotateX(-Math.PI / 2); roadGeo.rotateY(Math.atan2(-cu[1], cu[0])); roadGeo.translate(cm[0] + cn[0] * roadMid, 0, cm[1] + cn[1] * roadMid);
+  const road = new THREE.Mesh(drape(roadGeo, 0.03), std({ map: T_asphalt, color: 0x7f8281, roughness: .95 }));
+  road.receiveShadow = true; site.add(road);
 
-  // Piedrilla al frente (fotos) y pasos de concreto hasta la calle
-  const gravel = flat(scaleUV(new THREE.PlaneGeometry(6.9, 1.5), 6.9 / 1.2, 1.5 / 1.2), std({ map: T_gravel, color: 0xc4c1bc, roughness: 1 }), 0.02, 2);
-  gravel.position.set(X(3.0), 0.02, Z(7.83));
-  const padX = X(4.5), zStreet = cross(0, padX)[1];
-  for (let z = 5.55, i = 0; z < zStreet - 0.35; z += 0.75, i++) {
-    const pad = addBox(0.55, 0.05, 0.36, M.concrete, padX + (i % 2 ? 0.08 : -0.05), 0.025, z, site);
-    pad.rotation.y = (i % 2 ? 1 : -1) * 0.06;
+  // Piedrilla al frente de la casa (fotos), en la franja de BOQ.gap entre la casa y el muro del boquete, hasta la colindancia derecha
+  {
+    const x0 = X(-0.5), x1 = c1[0] + bu[0] * (SITE.front - BOQ.gap / 2) - 0.02;
+    const gravel = flat(scaleUV(new THREE.PlaneGeometry(x1 - x0, BOQ.gap), (x1 - x0) / 1.2, BOQ.gap / 1.2), std({ map: T_gravel, color: 0xc4c1bc, roughness: 1 }), 0.02, 2);
+    gravel.position.set((x0 + x1) / 2, 0.02, Z(D + 0.08) + BOQ.gap / 2);
+  }
+  // Grada (capa extra, se decide después), con huellas iguales y contrahuellas de no más de 18 cm. Hoy baja por el talud hasta la
+  // calle; con el boquete va pegada al muro, del lado de la calle, y baja hacia la izquierda desde junto a la puerta principal
+  const extraNow = new THREE.Group(), extraBoq = new THREE.Group(); extra.add(extraNow, extraBoq);
+  {
+    const padX = X(4.5), zCrest = c1[1] - (GROUND.talud + (padX - c1[0]) * cn[0]) / cn[1];
+    const tp = tAl(padX, zCrest), rise = -streetY(tp), sTop = GROUND.talud + 0.05, sBot = -0.55;   // arranca en la orilla y el primer escalón queda en la calle
+    const n = Math.ceil(rise / 0.18), tread = (sTop - sBot) / n;
+    for (let i = 0; i < n; i++) {
+      const sm = sTop - (i + 0.5) * tread, top = -rise * i / n, bot = -rise - 0.05;
+      const step = addBox(1.1, top - bot, tread + 0.01, M.concrete, c1[0] + cu[0] * tp - cn[0] * sm, (top + bot) / 2, c1[1] + cu[1] * tp - cn[1] * sm, extraNow);
+      step.rotation.y = Math.atan2(-cu[1], cu[0]);
+    }
+  }
+  {
+    // Marco del muro: w al oeste (a lo largo del muro) y v hacia el fondo; la grada ocupa 0.90 frente al muro
+    const P = (w, v) => [c1[0] + bw[0] * w + bu[0] * v, c1[1] + bw[1] * w + bu[1] * v];
+    const w0 = X(3.0) - c1[0], vb = BOQ.depth, dep = 0.9, run = 0.28;
+    const rise = -floorY(...P(w0 - 3, vb - dep / 2)), n = Math.ceil(rise / 0.18);
+    const put = (wa, wb, top) => {
+      const [x, z] = P((wa + wb) / 2, vb - dep / 2), bot = floorY(x, z) - 0.1;
+      const m = addBox(wb - wa, top - bot, dep, M.concrete, x, (top + bot) / 2, z, extraBoq); m.rotation.y = Math.atan2(-bw[1], bw[0]);
+    };
+    put(w0 - dep, w0, 0);                                                   // descanso arriba, al nivel del patio
+    for (let i = 1; i < n; i++) put(w0 - dep - i * run, w0 - dep - (i - 1) * run, -rise * i / n);
   }
 
-  // Casas vecinas pegadas a las colindancias laterales (2-3 al este y 4-1 al oeste), con la pared justo sobre la línea del lote.
-  // Largo, fondo y altura (NB) son supuestos: van a la par de la casa
-  const NB = { len: 9, depth: 6, h: 2.6 };
-  const nbWall = std({ color: 0xDAD5CB, map: T_plaster, roughness: .95 });
+  // Casa vecina de la izquierda (al este), pegada a la colindancia 2-3 con la pared justo sobre la línea del lote.
+  // Según la dueña está casi a nivel de calle y más adelante que la de la derecha: la tapia llega a ella después de unas 2½ baldosas
+  // (from, a lo largo de la colindancia desde el vértice 2). En las fotos es de repello gris sin pintar, larga, con techo de una sola
+  // agua gris con bordes verdes, alto del lado de este lote, y su parte de atrás queda más o menos a la par de la casa de la derecha (to).
+  // El fondo (depth) y la altura (h, del lado alto) son supuestos
+  const NB = { from: 3.75, to: 18.0, depth: 7, h: 3.0 };
+  const nbWall = std({ color: 0xA3A6A2, map: T_plaster, roughness: .95 });
+  // Techo gris claro en la vista satelital; los bordes (fascias) verdes, como en las fotos
+  const nbRoofMat = [0, 1, 2, 3, 4, 5].map(i => i === 2 || i === 3 ? std({ map: T_roof, color: 0xC6CCCF, roughness: .5, metalness: .1 }) : std({ color: 0x2F6B4F, roughness: .6 }));
   // Colindancia de LOT[i] a LOT[j]: dirección u, largo L, distancia t del vértice i al pie f (a la par de la casa) y normal n hacia afuera
   const sideLine = (i, j) => {
     const a = LOT[i], b = LOT[j], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -859,42 +1080,238 @@
     const f = [a[0] + u[0] * t, a[1] + u[1] * t], fl = Math.hypot(f[0], f[1]);
     return { a, u, L, t, f, n: [f[0] / fl, f[1] / fl] };
   };
-  [[1, 2], [3, 0]].forEach(([i, j]) => {
-    const { u, f, n } = sideLine(i, j);
+  {
+    const { a, u, n } = sideLine(1, 2), len = NB.to - NB.from, mid = (NB.from + NB.to) / 2, off = NB.depth / 2 + 0.03;
+    const cx = a[0] + u[0] * mid + n[0] * off, cz = a[1] + u[1] * mid + n[1] * off, y0 = groundY(cx, cz);
     const g = new THREE.Group(); neighbors.add(g);
-    g.position.set(f[0] + n[0] * (NB.depth / 2 + 0.03), 0, f[1] + n[1] * (NB.depth / 2 + 0.03));
+    g.position.set(cx, y0, cz);
     g.rotation.y = Math.atan2(-u[1], u[0]);                   // x local a lo largo de la colindancia
     const side = Math.sign(-u[1] * n[0] + u[0] * n[1]);       // +1 si la z local apunta hacia afuera del lote
-    addBox(NB.len, NB.h, NB.depth, nbWall, 0, NB.h / 2, 0, g);
-    const nbRoof = addBox(NB.len + 0.4, 0.05, NB.depth + 0.6, M.roof, 0, NB.h + 0.22, side * 0.3, g);
-    scaleUV(nbRoof.geometry, (NB.len + 0.4) / 0.19, 1);
-    nbRoof.rotation.x = side * Math.atan(0.4 / NB.depth);      // una sola agua, alta del lado del lote
-  });
+    // Cuerpo con el perfil de la sola agua: alto (h) del lado de este lote y 0.60 más bajo del otro
+    const hd = NB.depth / 2, body = new THREE.ExtrudeGeometry(new THREE.Shape([[-hd, -0.1], [hd, -0.1], [hd, NB.h - (side > 0 ? 0 : 0.6)], [-hd, NB.h - (side > 0 ? 0.6 : 0)]]
+      .map(([x, y]) => new THREE.Vector2(x, y))), { depth: len, bevelEnabled: false });
+    body.rotateY(Math.PI / 2); body.translate(-len / 2, 0, 0);
+    const nbBody = new THREE.Mesh(body, nbWall); nbBody.castShadow = nbBody.receiveShadow = true; g.add(nbBody);
+    const nbRoof = addBox(len + 0.4, 0.05, NB.depth + 0.6, nbRoofMat, 0, NB.h - 0.27, side * 0.3, g);
+    scaleUV(nbRoof.geometry, (len + 0.4) / 0.19, 1);
+    nbRoof.rotation.x = side * Math.atan(0.6 / NB.depth);      // una sola agua, alta del lado del lote
+  }
 
-  // Tapia prefabricada en la colindancia 2-3 (vecino de la izquierda visto desde la calle), solo donde no está la casa vecina:
-  // de la calle hasta la casa vecina y de ahí hasta el fondo. La cara hacia el lote queda al ras de la casa vecina.
-  // Alto, separación de columnas y color son supuestos (TAPIA)
+  /* ---------- casa del vecino de la derecha (fotos del 2026-09-19) ---------- */
+  // Prefabricada, del mismo sistema que la nuestra pero más grande (YH, junto al terreno). Medidas por fuera, de las fotos y de la
+  // vista satelital (el techo rojo mide ahí 6.30 × 10.41 m con los aleros, que es lo que dan w + 2·ovs y d + 2·ovf):
+  // - Costado este (el que da a este lote): culata con 7 tramos de columnas (de 1.35 m), sin ventanas → 9.45 m. La cumbrera
+  //   queda entre la 3.ª y la 4.ª columna, a media casa, igual que en la nuestra (techo a dos aguas con canoa al frente y atrás).
+  // - Frente de 6.00 m, más o menos simétrico (dueña): ventana, puerta al centro y ventana.
+  // - Culata más alta que la nuestra: sube unos 1.10 m sobre la fascia. Paredes crema, fascias y canoas vino, cielo raso crema,
+  //   techo rojo. Torcida 6.5° con la colindancia, como en la vista satelital. Atrás, un rancho de zinc hasta el corte.
+  // El costado oeste y la parte de atrás no se ven en las fotos: sus ventanas y la puerta trasera son ilustrativas
+  const nbGlass = std({ color: 0xE4E6E3, roughness: .7, emissive: 0xffc37d, emissiveIntensity: 0 });   // cortinas claras, como en las fotos
+  {
+    const g = new THREE.Group(); neighbors.add(g);
+    g.position.set(P0[0], 0, P0[1]); g.rotation.y = Math.atan2(-hu[1], hu[0]);
+    const sv = Math.sign(hv[1] * hu[0] - hv[0] * hu[1]);               // la z local es sv · v
+    const YM = {
+      wall: std({ color: 0xEFE2BC, map: T_plaster, roughness: .92 }), col: std({ color: 0xF5EDD5, map: T_plaster, roughness: .9 }),
+      wine: std({ color: 0x7B2F2B, roughness: .6 }), soffit: std({ color: 0xE6DCC2, roughness: .9, side: THREE.DoubleSide }),
+    };
+    const box = (u0, u1, v0, v1, y0, y1, m) => addBox(u1 - u0, y1 - y0, v1 - v0, m, (u0 + u1) / 2, (y0 + y1) / 2, sv * (v0 + v1) / 2, g);
+    const P = ([u, y, v]) => new V3(u, y, sv * v);
+    const bar = (a, b, w, h, m) => {                                    // barra de a a b, puntos [u, y, v]
+      const A = P(a), B = P(b), mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, A.distanceTo(B)), m);
+      mesh.position.copy(A).add(B).multiplyScalar(0.5); mesh.quaternion.setFromUnitVectors(new V3(0, 0, 1), B.clone().sub(A).normalize());
+      mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); return mesh;
+    };
+    const { w: YW, d: YD, fl, h, ovf, ovs } = YH, top = fl + h;
+    // Cuerpo, contrapiso y acera de concreto al frente
+    box(0, YW, 0, YD, -0.1, top, YM.wall);
+    box(0, YW, -1.0, 0, -0.06, 0.05, M.concrete);
+    // Columnas: 8 en cada costado (7 tramos), y en el frente y atrás
+    const cols = [[1.5, 0], [2.46, 0], [3.54, 0], [4.5, 0], [1.5, YD], [3.0, YD], [4.5, YD]];
+    for (let k = 0; k <= 7; k++) cols.push([0, YH.bay * k], [YW, YH.bay * k]);
+    cols.forEach(([u, v]) => box(u - 0.065, u + 0.065, v - 0.065, v + 0.065, -0.05, top + 0.02, YM.col));
+    // Ventanas (marco negro) y puertas. face: '-v' frente, '+v' atrás, '+u' costado oeste; at: coordenada de esa cara
+    const opening = (face, at, a, b, y0, y1, door) => {
+      const o = face === '-v' ? -1 : 1;
+      const put = (a0, a1, b0, b1, m, out) => {                        // out: cuánto sobresale de la cara
+        const d0 = Math.min(at - o * 0.03, at + o * out), d1 = Math.max(at - o * 0.03, at + o * out);
+        return face === '+u' ? box(d0, d1, a0, a1, fl + b0, fl + b1, m) : box(a0, a1, d0, d1, fl + b0, fl + b1, m);
+      };
+      if (door) {
+        put(a, b, y0, y1, M.door, 0.01);
+        [[a - 0.05, a, y0, y1 + 0.05], [b, b + 0.05, y0, y1 + 0.05], [a, b, y1, y1 + 0.05]].forEach(([p, q, r0, r1]) => put(p, q, r0, r1, M.cedar, 0.03));
+        return;
+      }
+      put(a, b, y0, y1, nbGlass, 0.008);
+      const m = (a + b) / 2;
+      [[a, a + 0.05, y0 + 0.05, y1 - 0.05], [b - 0.05, b, y0 + 0.05, y1 - 0.05], [a, b, y0, y0 + 0.05], [a, b, y1 - 0.05, y1], [m - 0.02, m + 0.02, y0 + 0.05, y1 - 0.05]]
+        .forEach(([p, q, r0, r1]) => put(p, q, r0, r1, M.alu, 0.03));
+    };
+    opening('-v', 0, 0.2, 1.3, 0.5, 2.0); opening('-v', 0, 4.7, 5.8, 0.5, 2.0);   // ventanas del frente
+    opening('-v', 0, 2.52, 3.48, 0, 2.1, true);                                   // puerta principal, al centro
+    opening('+u', YW, 2.08, 3.16, 1.0, 2.0); opening('+u', YW, 6.13, 7.21, 1.0, 2.0);
+    opening('+v', YD, 0.8, 2.18, 1.0, 2.0); opening('+v', YD, 3.3, 4.26, 0, 2.1, true);
+    // Techo a dos aguas: cumbrera a lo ancho, a media casa
+    const CE = fl + h - 0.1, EV = CE + 0.26, vr = (YD + 2 * ovf) / 2 - ovf, k = YH.rise / (vr + ovf);
+    const yRoof = v => v < vr ? EV + (v + ovf) * k : EV + (YD + ovf - v) * k;
+    const eave = [[-ovs, -ovf], [YW + ovs, -ovf]];                     // borde del alero del frente, de este a oeste
+    const poly = (pts, yOf, m) => {
+      const pos = [], uv = [];
+      THREE.ShapeUtils.triangulateShape(pts.map(([u, v]) => new THREE.Vector2(u, v)), []).forEach(tri => tri.forEach(i => {
+        const [u, v] = pts[i]; pos.push(u, yOf(u, v), sv * v); uv.push(u / 0.19, v);
+      }));
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, m); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); return mesh;
+    };
+    const redRoof = std({ map: T_roof, color: 0xB34A40, roughness: .5, metalness: .1, side: THREE.DoubleSide });   // rojo en la vista satelital
+    poly(eave.concat([[YW + ovs, vr], [-ovs, vr]]), (u, v) => yRoof(v), redRoof);
+    poly([[-ovs, vr], [YW + ovs, vr], [YW + ovs, YD + ovf], [-ovs, YD + ovf]], (u, v) => yRoof(v), redRoof);
+    poly(eave.concat([[YW + ovs, YD + ovf], [-ovs, YD + ovf]]), () => CE, YM.soffit);             // cielo raso de los aleros
+    // Culatas al ras de los costados, del borde de la pared hasta el techo
+    [[0, 0, -1], [YW, 0, 1]].forEach(([u, v0, o]) => {
+      const shape = new THREE.Shape([[v0, top], [YD, top], [YD, yRoof(YD) - 0.01], [vr, yRoof(vr) - 0.01], [v0, yRoof(v0) - 0.01]].map(([v, y]) => new THREE.Vector2(sv * v, y)));
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.03, bevelEnabled: false });
+      geo.rotateY(-Math.PI / 2); geo.translate(u + (o > 0 ? 0.03 : 0), 0, 0);
+      const mesh = new THREE.Mesh(geo, YM.wall); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh);
+    });
+    // Botaguas vino sobre los bordes inclinados, y fascia crema con canoa vino en los aleros del frente y de atrás
+    [[-ovs + 0.03, -ovf], [YW + ovs - 0.03, -ovf]].forEach(([u, v0]) => {
+      bar([u, yRoof(v0) + 0.06, v0], [u, yRoof(vr) + 0.06, vr], 0.07, 0.2, YM.wine);
+      bar([u, yRoof(vr) + 0.06, vr], [u, yRoof(YD + ovf) + 0.06, YD + ovf], 0.07, 0.2, YM.wine);
+    });
+    const edge = (a, b) => {
+      const ya = yRoof(a[1]), yb = yRoof(b[1]), hf = (ya + yb) / 2 - CE;
+      bar([a[0], CE + hf / 2, a[1]], [b[0], CE + hf / 2, b[1]], 0.04, hf, YM.col);
+      bar([a[0], ya - 0.02, a[1]], [b[0], yb - 0.02, b[1]], 0.16, 0.15, YM.wine);
+    };
+    eave.slice(1).forEach((b, i) => edge(eave[i], b));
+    edge([-ovs, YD + ovf], [YW + ovs, YD + ovf]);
+    // Rancho de zinc atrás, sobre una losa, con tres postes de tubo
+    box(0, YW, YD, YD + YH.shed, -0.06, 0.06, M.concrete);
+    poly([[0, YD + ovf - 0.1], [YW, YD + ovf - 0.1], [YW, YD + YH.shed], [0, YD + YH.shed]], (u, v) => CE - 0.08 - (v - YD - ovf + 0.1) * 0.12, M.roof);
+    [0.08, YW / 2, YW - 0.08].forEach(u => bar([u, 0, YD + YH.shed - 0.08], [u, CE - 0.08 - (YH.shed - ovf + 0.02) * 0.12, YD + YH.shed - 0.08], 0.06, 0.06, M.alu));
+  }
+
+  // Rampa de concreto del vecino, de la calle a su casa, y su muro de bloques en L (RAMP). Corona al nivel de la terraza; en la calle
+  // tiene 8 hiladas (1.60 m) y a lo largo de la entrada baja con la rampa
+  {
+    const lerp = (p, q, k) => [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k];
+    const len = (p, q) => Math.hypot(q[0] - p[0], q[1] - p[1]);
+    // Losa de la rampa: de la calle al frente de la casa, entre el muro y el borde oeste
+    const nE = [(Ws[0] - Es[0]) / len(Es, Ws), (Ws[1] - Es[1]) / len(Es, Ws)];
+    const E0 = [Es[0] + nE[0] * 0.002, Es[1] + nE[1] * 0.002], E1 = [Eh[0] + nE[0] * 0.002, Eh[1] + nE[1] * 0.002];
+    const NS = 24, NW = 4, pos = [], uv = [], idx = [];
+    for (let i = 0; i <= NS; i++) for (let j = 0; j <= NW; j++) {
+      const [x, z] = lerp(lerp(E0, E1, i / NS), lerp(Ws, Wh, i / NS), j / NW);
+      pos.push(x, groundY(x, z) + 0.03, z); uv.push(x / 2, z / 2);
+      if (i < NS && j < NW) { const q = i * (NW + 1) + j; idx.push(q, q + 1, q + NW + 1, q + 1, q + NW + 2, q + NW + 1); }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    const ramp = new THREE.Mesh(geo, std({ color: 0xA9A59D, map: T_concrete, roughness: .95, side: THREE.DoubleSide }));
+    ramp.receiveShadow = true; site.add(ramp);
+    // Muro de bloques: tramos rectos agrupados por número de hiladas
+    const blockMat = std({ color: 0x9A9FA3, map: T_block, roughness: .95 });
+    const blocks = (p, q, n, thick) => {                      // muro de p a q (eje del muro) con n hiladas y corona en la terraza
+      const hh = 0.2 * n + 0.02, m = addBox(thick, hh, len(p, q), blockMat, (p[0] + q[0]) / 2, 0.02 - hh / 2, (p[1] + q[1]) / 2, site);
+      m.rotation.y = Math.atan2(q[0] - p[0], q[1] - p[1]); scaleUV(m.geometry, len(p, q) / 0.8, hh / 0.4);
+    };
+    const off = RAMP.wall / 2, B0 = [Es[0] - nE[0] * off, Es[1] - nE[1] * off], B1 = [Eh[0] - nE[0] * off, Eh[1] - nE[1] * off];
+    const courses = k => { const [x, z] = lerp(lerp(Es, Eh, k), lerp(Ws, Wh, k), 0.1); return Math.max(0, Math.ceil(-groundY(x, z) / 0.2 - 0.05)); };
+    const nSeg = Math.ceil(len(B0, B1) / 0.4), runs = [];
+    for (let i = 0; i < nSeg; i++) {
+      const n = Math.max(courses(i / nSeg), courses((i + 1) / nSeg));
+      if (runs.length && runs[runs.length - 1].n === n) runs[runs.length - 1].k1 = (i + 1) / nSeg; else runs.push({ n, k0: i / nSeg, k1: (i + 1) / nSeg });
+    }
+    runs.filter(r => r.n > 0).forEach(r => blocks(lerp(B0, B1, r.k0), lerp(B0, B1, r.k1), r.n, RAMP.wall));
+    // Tramo frente a la calle: de la colindancia 4-1 hasta el muro de la entrada, sobre la línea del frente
+    const inS = [-cn[0] * off, -cn[1] * off];
+    blocks([c1[0] + inS[0], c1[1] + inS[1]], [B0[0] + inS[0], B0[1] + inS[1]], Math.ceil(-streetY(0) / 0.2 - 0.05), RAMP.wall);
+    // Franja del vecino detrás del muro, a nivel de terraza (zacate); tapa el escalón que deja la malla del terreno
+    const F0 = [B0[0] - nE[0] * off, B0[1] - nE[1] * off], F1 = [B1[0] - nE[0] * off, B1[1] - nE[1] * off];
+    const kS = (RAMP.wall - sIn(...F0)) / (sIn(...F1) - sIn(...F0)), A1 = lerp(F0, F1, kS);
+    const vEnd = (F1[0] - c1[0]) * bu[0] + (F1[1] - c1[1]) * bu[1];
+    const v0 = RAMP.wall / -(bu[0] * cn[0] + bu[1] * cn[1]);                 // sobre la colindancia, a `wall` de la calle
+    const strip = new THREE.ShapeGeometry(new THREE.Shape([[c1[0] + bu[0] * v0, c1[1] + bu[1] * v0], A1, F1, [c1[0] + bu[0] * vEnd, c1[1] + bu[1] * vEnd]]
+      .map(([x, z]) => new THREE.Vector2(x, -z))));
+    const sp = strip.attributes.position, su = strip.attributes.uv;
+    for (let i = 0; i < su.count; i++) su.setXY(i, sp.getX(i) / 4, -sp.getY(i) / 4);   // mismo tamaño de zacate que el terreno
+    flat(strip, std({ map: T_grass, roughness: 1 }), 0.012, 1);
+  }
+
+  /* Boquete (capa Boquete, proyecto): piso de concreto a nivel de calle y muros de contención de bloque. Uno a la derecha, sobre la
+     colindancia 4-1 del lado de este lote, que sostiene la franja del vecino; otro atrás, paralelo al frente de la casa, de lindero a
+     lindero. A la izquierda no hace falta: el lote vecino está casi a nivel de calle y ahí ya están la tapia y su casa. Todavía sin
+     losa: queda abierto, como garaje sin techo */
+  {
+    const newBlock = std({ color: 0xB4B8BA, map: T_block, roughness: .95 });
+    const P = (w, v) => [c1[0] + bw[0] * w + bu[0] * v, c1[1] + bw[1] * w + bu[1] * v];
+    // Muro recto de a a b (puntos del eje del muro) con la corona al nivel del patio
+    const wallAB = (a, b, thick) => {
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const bot = Math.min(...[0, 0.5, 1].map(k => floorY(a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k))) - 0.3, hh = 0.02 - bot;
+      const m = addBox(thick, hh, len, newBlock, (a[0] + b[0]) / 2, bot + hh / 2, (a[1] + b[1]) / 2, boqG);
+      m.rotation.y = Math.atan2(b[0] - a[0], b[1] - a[1]); scaleUV(m.geometry, len / 0.8, hh / 0.4);
+    };
+    const t = BOQ.wall, vm = BOQ.depth + t / 2;
+    // Donde el eje del muro de atrás corta la colindancia 2-3 (w negativo, al este)
+    const kw = bw[0] * be[0] + bw[1] * be[1], wL = -eOf(...P(0, vm)) / kw;
+    wallAB(P(-t / 2, 0), P(-t / 2, BOQ.depth), t);                         // derecha, sobre la colindancia
+    wallAB(P(0, vm), P(wL, vm), t);                                         // atrás, de lindero a lindero
+    // Piso: el lote hasta la cara del muro de atrás, con la pendiente de la calle y un poco de caída hacia ella
+    const pts = clipIn(LOT, ([x, z]) => BOQ.depth - vOf(x, z));
+    const geo = new THREE.ShapeGeometry(new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z))));
+    geo.rotateX(-Math.PI / 2);
+    const gp = geo.attributes.position, gu = geo.attributes.uv;
+    for (let i = 0; i < gp.count; i++) { gp.setY(i, floorY(gp.getX(i), gp.getZ(i)) + 0.012); gu.setXY(i, gp.getX(i) / 3, gp.getZ(i) / 3); }
+    geo.computeVertexNormals();
+    const floor = new THREE.Mesh(geo, std({ color: 0xB0ABA3, map: T_concrete, roughness: .95 })); floor.receiveShadow = true; boqG.add(floor);
+    boqMid = pts.reduce((acc, [x, z]) => [acc[0] + x / pts.length, acc[1] + z / pts.length], [0, 0]);
+  }
+
+  // Tapia prefabricada en la colindancia 2-3, solo donde no está la casa vecina: de la calle a la casa (unas 2½ baldosas, dueña) y de
+  // la casa al fondo. Como el lote de la izquierda queda casi a nivel de calle, la tapia hace de muro de contención: cada tramo
+  // arranca del suelo más bajo y sube por lo menos 4 baldosas (TAPIA.h) y hasta 0.50 m sobre este lote. Sigue por el frente del
+  // lote de la izquierda, a lo largo de la calle, como en las fotos. Separación de columnas (span) y color son supuestos
   const TAPIA = { h: 2.0, span: 1.5, col: 0.12, slab: 0.05 };
   const tapiaSlab = std({ color: 0xBDB9B1, map: T_slab, roughness: .95 });
   const tapiaCol = std({ color: 0xC4C0B8, map: T_concrete, roughness: .95 });
-  {
-    const { a, u, L, t, n } = sideLine(1, 2), off = 0.03 + TAPIA.col / 2, g = new THREE.Group(); site.add(g);
-    g.position.set(a[0] + n[0] * off, 0, a[1] + n[1] * off);   // x local = metros desde el vértice 2, sobre la colindancia
-    g.rotation.y = Math.atan2(-u[1], u[0]);
-    [[0, t - NB.len / 2], [t + NB.len / 2, L]].forEach(([s0, s1]) => {
-      const k = Math.ceil((s1 - s0 - TAPIA.col) / TAPIA.span), step = (s1 - s0 - TAPIA.col) / k, len = step - TAPIA.col;
-      for (let c = 0; c <= k; c++) addBox(TAPIA.col, TAPIA.h + 0.05, TAPIA.col, tapiaCol, s0 + TAPIA.col / 2 + c * step, (TAPIA.h + 0.05) / 2, 0, g);
-      for (let c = 0; c < k; c++) {
-        const slab = addBox(len, TAPIA.h, TAPIA.slab, tapiaSlab, s0 + TAPIA.col / 2 + (c + 0.5) * step, TAPIA.h / 2, 0, g);
-        scaleUV(slab.geometry, len, TAPIA.h / 0.5);
-      }
+  // Tapia recta desde p en la dirección d, de s0 a s1 metros. other: desplazamiento hacia el lado que marca su alto mínimo
+  const tapiaRun = (p, d, other, s0, s1) => {
+    const g = new THREE.Group(); site.add(g); g.position.set(p[0], 0, p[1]); g.rotation.y = Math.atan2(-d[1], d[0]);
+    const at = x => [p[0] + d[0] * x, p[1] + d[1] * x], posts = [];
+    for (let x = s0 + TAPIA.col / 2; x < s1 - TAPIA.col / 2 - 0.3; x += TAPIA.span) posts.push(x);
+    posts.push(s1 - TAPIA.col / 2);
+    const bays = posts.slice(1).map((x1, c) => {
+      const x0 = posts[c], xs = [0, .25, .5, .75, 1].map(f => x0 + (x1 - x0) * f);
+      // La base llega al suelo más bajo de los dos lados, también con el boquete; el alto se mide con el terreno de hoy
+      const base = Math.min(...xs.map(x => { const [px, pz] = at(x); return Math.min(groundY(px, pz), boqY(px, pz), boqY(px + other[0], pz + other[1])); }));
+      const far = Math.max(...xs.map(x => { const [px, pz] = at(x); return groundY(px + other[0], pz + other[1]); }));
+      const n = Math.max(TAPIA.h / 0.5, Math.ceil((far + 0.5 - base) / 0.5 - 0.05));
+      return [x0, x1, base, base + n * 0.5];
     });
+    posts.forEach((x, c) => {
+      const A = bays[Math.max(0, c - 1)], B = bays[Math.min(bays.length - 1, c)], b0 = Math.min(A[2], B[2]), b1 = Math.max(A[3], B[3]) + 0.05;
+      addBox(TAPIA.col, b1 - b0, TAPIA.col, tapiaCol, x, (b0 + b1) / 2, 0, g);
+    });
+    bays.forEach(([x0, x1, b0, b1]) => {
+      const len = x1 - x0 - TAPIA.col, slab = addBox(len, b1 - b0, TAPIA.slab, tapiaSlab, (x0 + x1) / 2, (b0 + b1) / 2, 0, g);
+      scaleUV(slab.geometry, len, (b1 - b0) / 0.5);
+    });
+  };
+  {
+    const { a, u, L, n } = sideLine(1, 2), off = 0.03 + TAPIA.col / 2, p = [a[0] + n[0] * off, a[1] + n[1] * off];
+    [[0, NB.from], [NB.to, L]].forEach(([s0, s1]) => tapiaRun(p, u, [-n[0] * 0.5, -n[1] * 0.5], s0, s1));
+    tapiaRun([a[0] - cn[0] * off, a[1] - cn[1] * off], cu, [cn[0] * 0.5, cn[1] * 0.5], 0.15, 8.15);
   }
 
   const leafMats = [0x4c7a3b, 0x5f8c46, 0x3f6a34, 0x6e9a52].map(c => std({ color: c, roughness: .9, flatShading: true }));
   const bark = std({ color: 0x5b4332, roughness: 1 });
   function tree(x, z, sc, seed) {
-    const r = rng(seed), g = new THREE.Group(); g.position.set(x, 0, z); site.add(g);
+    const r = rng(seed), g = new THREE.Group(); g.position.set(x, groundY(x, z) - 0.05, z); site.add(g);
     const th = 1.5 * sc, trunk = new THREE.Mesh(new THREE.CylinderGeometry(.09 * sc, .14 * sc, th, 7), bark);
     trunk.position.y = th / 2; trunk.castShadow = true; g.add(trunk);
     const n = 3 + (r() * 2 | 0);
@@ -908,9 +1325,22 @@
   [[2.6, -10.5, 0.85], [-2.4, -11.4, 0.75], [0.5, -19, 1.6], [-8, -17.5, 1.3], [9, -18.5, 1.4], [-14.5, -2, 1.3], [15, 1.5, 1.2],
    [16.6, -9.5, 1.5], [-13, -11, 1.2], [-13, 9, 1.1], [-7, 30, 1.2], [8, 26, 1.3], [21, 21, 1.1]]
     .forEach(([x, z, sc], i) => tree(x, z, sc, 20 + i));
-  [[-3.6, 5.5, .4], [3.7, -6.2, .45]].forEach(([x, z, sc], i) => {
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2 * sc, 1), leafMats[i % 4]);
-    m.position.set(x, 0.75 * sc, z); m.castShadow = m.receiveShadow = true; site.add(m);
+  const bush = (x, z, rad, i) => {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), leafMats[i % 4]);
+    m.position.set(x, groundY(x, z) + rad * 0.5, z); m.scale.y = 0.8; m.castShadow = m.receiveShadow = true; site.add(m);
+  };
+  [[-4.1, 1.8, .48], [1.9, -8.0, .54]].forEach(([x, z, rad], i) => bush(x, z, rad, i));   // a la izquierda de la casa y en el patio de atrás
+  // Cerro detrás del corte: cafetal con árboles de sombra, como en las fotos. Posiciones a lo largo del fondo (along) y hacia atrás (back)
+  {
+    const r = rng(77), bdir = [(LOT[2][0] - LOT[3][0]) / bl, (LOT[2][1] - LOT[3][1]) / bl];
+    const onHill = (along, back) => [LOT[3][0] + bdir[0] * along + bn[0] * back, LOT[3][1] + bdir[1] * along + bn[1] * back];
+    for (let i = 0; i < 12; i++) { const [x, z] = onHill(-14 + i * 3 + r() * 2, 4 + r() * 9); tree(x, z, 1.1 + r() * 0.6, 60 + i); }
+    for (let i = 0; i < 34; i++) { const [x, z] = onHill(-15 + r() * 36, 1.6 + r() * 11); bush(x, z, 0.55 + r() * 0.3, i); }
+  }
+  // Monte en los taludes del frente de los vecinos (el de este lote queda limpio, porque ahí va el boquete)
+  [9.6, 12.4, -7.8].forEach((t, i) => {
+    const s = 1.0 + (i % 3) * 0.35;
+    bush(c1[0] + cu[0] * t - cn[0] * s, c1[1] + cu[1] * t - cn[1] * s, 0.45 + (i % 2) * 0.15, i);
   });
 
   /* ---------- cielo, sol y estrellas ---------- */
@@ -931,7 +1361,7 @@
   const amb = new THREE.AmbientLight(0xffffff, 0.1); scene.add(amb);
   const sun = new THREE.DirectionalLight(0xfff4e2, 1.0);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -17, right: 17, top: 17, bottom: -17, near: 1, far: 90 });
+  Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 1, far: 100 });   // alcanza la casa del vecino
   const EAST = azDir(Math.PI / 2), SOUTH = azDir(Math.PI);   // el sol sale al este y, a 10° de latitud norte, se recuesta al sur
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
   scene.add(sun); scene.add(sun.target);
@@ -961,6 +1391,7 @@
     starMat.opacity = night * 0.9; stars.visible = night > 0.02;
     M.glass.emissiveIntensity = night * 0.85; M.glass.opacity = 0.42 + 0.4 * night;
     M.frosted.emissiveIntensity = night * 0.8;
+    nbGlass.emissiveIntensity = night * 0.55;
     M.bulb.emissiveIntensity = night * 1.6;
     roomLights.forEach(L => { L.intensity = night * L.userData.max; });
     const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
@@ -1004,12 +1435,13 @@
 
   // Lote (solo en la vista Lote): largo de cada lado por fuera de la línea roja, vértices, distancias de la casa al borde, calle y norte
   const lotLabel = (cls, html, pos) => { addLabel(cls, html, pos).grp = lotDims; };
+  const onGround = (x, z, lift) => new V3(x, groundY(x, z) + lift, z);
   const lotMid = LOT.reduce((acc, pt) => [acc[0] + pt[0] / 4, acc[1] + pt[1] / 4], [0, 0]);
   LOT.forEach((pt, i) => {
     const q = LOT[(i + 1) % 4], m = [(pt[0] + q[0]) / 2, (pt[1] + q[1]) / 2];
     const k = -0.9 / Math.hypot(lotMid[0] - m[0], lotMid[1] - m[1]);
-    lotLabel('dim', `${DERROTERO[i][1].toFixed(2)} m`, new V3(m[0] + (lotMid[0] - m[0]) * k, 0.06, m[1] + (lotMid[1] - m[1]) * k));
-    lotLabel('dim lot-pt', String(i + 1), new V3(pt[0], 0.4, pt[1]));
+    lotLabel('dim', `${DERROTERO[i][1].toFixed(2)} m`, onGround(m[0] + (lotMid[0] - m[0]) * k, m[1] + (lotMid[1] - m[1]) * k, 0.06));
+    lotLabel('dim lot-pt', String(i + 1), onGround(pt[0], pt[1], 0.4));
   });
   // Lote vecino de la derecha: sus tres lados propios, por fuera como los de este lote (el lado compartido es el 24.71),
   // y su área cerca del fondo, lejos de la casa vecina
@@ -1028,25 +1460,36 @@
     const s = LOT.concat([LOT_DER[0], LOT_DER[3]]).map(([x, z]) => x * dir.x + z * dir.z), c = (Math.min(...s) + Math.max(...s)) / 2;
     return [acc[0] + dir.x * c, acc[1] + dir.z * c];
   }, [0, 0]);
-  // Distancias medidas sobre los ejes de la casa: iguales adelante y atrás, e iguales a los dos lados
-  const [zBack, zFront] = cross(0), [xLeft, xRight] = cross(1);
-  dimLine(W / 2, 7.06, W / 2, zFront + D / 2, (zFront - Z(7.06)).toFixed(2), lotDims);
-  dimLine(W / 2, -0.06, W / 2, zBack + D / 2, (Z(-0.06) - zBack).toFixed(2), lotDims);
+  // Distancias de la casa al borde del lote: a la calle y al fondo por el lado derecho (sobre la colindancia 4-1) y por el izquierdo,
+  // y al vecino de la izquierda a media casa. Del lado derecho el borde del techo queda sobre la línea. Con el boquete, la distancia a
+  // la calle del lado derecho se parte en casa-muro y muro-calle (nowDims y boqDims, dentro de lotDims)
+  const nowDims = new THREE.Group(), boqDims = new THREE.Group(); lotDims.add(nowDims, boqDims);
+  const [xLeft] = cross(1), zAt = x => cross(0, x);
+  const xr = LOT[0][0] - 0.01 + W / 2, xl = -0.5, [zBackR, zFrontR] = zAt(X(xr)), [zBackL, zFrontL] = zAt(X(xl));   // xr: sobre la colindancia
+  dimLine(xr, D + 0.08, xr, zFrontR + D / 2, (zFrontR - Z(D + 0.08)).toFixed(2), nowDims);
+  const yWall = D + 0.08 + BOQ.gap;                                          // cara del muro del lado de la casa, en el plano
+  dimLine(xr, D + 0.08, xr, yWall, BOQ.gap.toFixed(2), boqDims);
+  dimLine(xr, yWall + BOQ.wall, xr, zFrontR + D / 2, (zFrontR - Z(yWall + BOQ.wall)).toFixed(2), boqDims);
+  addLabel('dim', 'Boquete a nivel de calle', new V3(boqMid[0], 0.06, boqMid[1])).grp = boqDims;
+  dimLine(xr, -0.06, xr, zBackR + D / 2, (Z(-0.06) - zBackR).toFixed(2), lotDims);
+  dimLine(xl, D + 0.06, xl, zFrontL + D / 2, (zFrontL - Z(D + 0.06)).toFixed(2), lotDims);
+  dimLine(xl, -0.06, xl, zBackL + D / 2, (Z(-0.06) - zBackL).toFixed(2), lotDims);
   dimLine(-0.06, D / 2, xLeft + W / 2, D / 2, (X(-0.06) - xLeft).toFixed(2), lotDims);
-  dimLine(W + 0.06, D / 2, xRight + W / 2, D / 2, (xRight - X(W + 0.06)).toFixed(2), lotDims);
-  $('#lot-gap').innerHTML = `${(xRight - X(W + 0.06)).toFixed(2)}<small>m</small>`;
+  $('#lot-gap').innerHTML = `${(X(-0.06) - xLeft).toFixed(2)}<small>m</small>`;
+  const zBack = Math.min(zBackR, zBackL);
   lotLabel('dim', 'Lote · 212 m²', new V3(lotMid[0] + 2.3, 0.06, zBack + 1.6));
-  lotLabel('dim', 'Calle pública', new V3(cm[0] + cn[0] * roadMid, 0.06, cm[1] + cn[1] * roadMid));
-  // Flecha al norte, en el frente del terreno vecino del este
+  lotLabel('dim', 'Calle pública', onGround(cm[0] + cn[0] * roadMid, cm[1] + cn[1] * roadMid, 0.06));
+  // Flecha al norte, en el frente del lote vecino del este (entre la calle y su casa)
   const NORTH = azDir(0), arrow = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([[0, 0.9], [0.4, 0], [0.12, 0.1], [0.12, -0.8], [-0.12, -0.8], [-0.12, 0.1], [-0.4, 0]]
     .map(([x, y]) => new THREE.Vector2(x * 1.4, y * 1.4)))), dimMat);
   arrow.geometry.rotateX(-Math.PI / 2);
-  arrow.position.copy(azDir(Math.PI / 2)).multiplyScalar(3.5).add(new V3(LOT[1][0], 0.06, LOT[1][1] - 2.5));
+  arrow.position.copy(azDir(Math.PI / 2)).multiplyScalar(3.5).add(new V3(LOT[1][0], 0, LOT[1][1] - 1.4));   // frente a la casa vecina
+  arrow.position.y = Math.max(...[[0, 0], [1.3, 0], [-1.3, 0], [0, 1.3], [0, -1.3]].map(([dx, dz]) => groundY(arrow.position.x + dx, arrow.position.z + dz))) + 0.06;
   arrow.rotation.y = Math.atan2(-NORTH.x, -NORTH.z); lotDims.add(arrow);
   lotLabel('dim', 'N', arrow.position.clone().addScaledVector(NORTH, 1.9));
 
   /* ---------- estado y controles ---------- */
-  const state = { roof: true, furn: true, names: true, dims: false, nb: true, view: 'exterior' };
+  const state = { roof: true, furn: true, names: true, dims: false, nb: true, boq: false, extra: false, view: 'exterior' };
   let selected = null;
   const syncNote = () => { $('#names-note').hidden = !(state.roof && state.names); };
   function setRoof(v) { state.roof = v; roof.visible = v; $('#t-roof').checked = v; syncNote(); }
@@ -1055,11 +1498,19 @@
   // Medidas: las de la casa en todas las vistas menos Lote, y las del lote solo en la vista Lote
   function setDims(v) { state.dims = v; dims.visible = v && state.view !== 'lote'; lotDims.visible = v && state.view === 'lote'; $('#t-dims').checked = v; }
   function setNb(v) { state.nb = v; neighbors.visible = v; $('#t-nb').checked = v; }
+  function setExtra(v) { state.extra = v; extra.visible = v; $('#t-extra').checked = v; }   // grada: se decide después
+  // Boquete (proyecto): cambia el terreno y lo que depende de él entre hoy y con el boquete
+  function setBoq(v) {
+    state.boq = v; $('#t-boq').checked = v; setGround(v);
+    today.visible = extraNow.visible = nowDims.visible = !v; boqG.visible = extraBoq.visible = boqDims.visible = v;
+  }
   $('#t-roof').addEventListener('change', e => setRoof(e.target.checked));
   $('#t-furn').addEventListener('change', e => setFurn(e.target.checked));
   $('#t-names').addEventListener('change', e => setNames(e.target.checked));
   $('#t-dims').addEventListener('change', e => setDims(e.target.checked));
   $('#t-nb').addEventListener('change', e => setNb(e.target.checked));
+  $('#t-extra').addEventListener('change', e => setExtra(e.target.checked));
+  $('#t-boq').addEventListener('change', e => setBoq(e.target.checked));
   $('#hour').addEventListener('input', e => applyHour(parseFloat(e.target.value)));
 
   // Colores: cada grupo pinta un material. El primer color de cada lista es el de las fotos
@@ -1194,14 +1645,15 @@
     controls.target.copy(start.t);
     flyTo(start.p, start.t);
   }
-  setRoof(true); setFurn(true); setNames(true); setDims(false); setNb(true);
+  setRoof(true); setFurn(true); setNames(true); setDims(false); setNb(true); setBoq(false); setExtra(false);
   applyHour(10);
 
   const v = new V3();
+  const shown = o => { for (; o; o = o.parent) if (!o.visible) return false; return true; };   // visible con todos sus padres
   function updateLabels() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     for (const L of labels) {
-      const show = L.kind === 'room' ? (state.names && !state.roof) : L.grp.visible;
+      const show = L.kind === 'room' ? (state.names && !state.roof) : shown(L.grp);
       if (show) { v.copy(L.pos).project(camera); }
       if (!show || v.z > 1) { if (!L.el.hidden) L.el.hidden = true; continue; }
       L.el.hidden = false;
@@ -1217,6 +1669,8 @@
       if (k === 1) tween = null;
     }
     controls.update();
+    const floor = (state.boq ? boqY : groundY)(camera.position.x, camera.position.z) + 0.6;   // que la cámara no se meta en el cerro ni en el talud
+    if (camera.position.y < floor) camera.position.y = floor;
     renderer.render(scene, camera);
     updateLabels();
     requestAnimationFrame(loop);
