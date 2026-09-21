@@ -179,7 +179,7 @@
   body.is-playing #stage{cursor:grab}
   .play-hud{position:fixed;inset:0;pointer-events:none}
   .play-hud>*{pointer-events:auto}
-  .fh-bar{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:16px;display:flex;align-items:stretch;max-width:calc(100% - 32px)}
+  .fh-bar{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:16px;display:flex;align-items:stretch;max-width:calc(100% - 32px);z-index:2}
   .fh-who{display:flex;flex-direction:column;justify-content:center;gap:5px;padding:9px 14px 10px 12px;min-width:0;background:none;border:0;color:var(--ink);text-align:left;cursor:pointer;font:inherit}
   .fh-who:hover{background:var(--paper-2)}
   .fh-who b{font:700 22px/.9 var(--display);letter-spacing:.03em;text-transform:uppercase}
@@ -194,6 +194,25 @@
   .fh-music svg{width:22px;height:22px;display:block}
   .fh-music[aria-pressed="true"]{color:var(--accent)}
   .fh-music[aria-pressed="true"] .mute,.fh-music[aria-pressed="false"] .wave{display:none}
+  .fh-more svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+  .fh-more[aria-expanded="true"]{background:var(--paper-2)}
+  .fh-panel{position:absolute;top:calc(100% + 6px);left:0;width:300px;padding:12px 14px 14px;display:flex;flex-direction:column;gap:12px}
+  .fh-hours{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .fh-hours button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px 7px;border:1px solid var(--rule);background:none;color:var(--ink);
+    font:600 11px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+  .fh-hours button:hover,.fh-opt:hover,.fh-photo:hover{background:var(--paper-2)}
+  .fh-hours svg,.fh-photo svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .fh-opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .fh-opt{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--rule);background:none;color:var(--ink);font:500 13px/1.1 var(--body);text-align:left;cursor:pointer}
+  .fh-opt .box{width:14px;height:14px;border:1.5px solid var(--ink);display:grid;place-items:center;flex:none}
+  .fh-opt[aria-pressed="true"] .box{background:var(--ink)}
+  .fh-opt[aria-pressed="true"] .box::after{content:"";width:4px;height:8px;border-right:2px solid var(--paper);border-bottom:2px solid var(--paper);transform:translateY(-1px) rotate(45deg)}
+  .fh-photo{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+    font:600 13px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+  .fh-photo:hover{background:var(--accent);border-color:var(--accent)}
+  .fh-map{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:140px;height:140px;border:1px solid var(--rule-strong);box-shadow:var(--shadow);background:var(--paper);pointer-events:none}
+  .fh-flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .45s ease}
+  .fh-flash.is-on{opacity:.85;transition:none}
   .fh-btn.fh-exit{background:var(--ink);color:var(--paper);border-left-color:var(--ink)}
   .fh-btn.fh-exit:hover{background:var(--accent);border-left-color:var(--accent)}
   .stick{position:absolute;bottom:calc(28px + env(safe-area-inset-bottom,0px));width:136px;height:136px;border-radius:50%;background:var(--glass);border:1px solid var(--rule-strong);box-shadow:var(--shadow);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
@@ -270,6 +289,8 @@
     /* el encabezado recorta lo que se sale de él, así que el submenú de Jugar va fijo en la pantalla, debajo */
     .play-menu{position:fixed;top:calc(58px + env(safe-area-inset-top,0px));right:10px}
     .fh-bar{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:10px;max-width:none}
+    .fh-panel{left:0;right:0;width:auto}
+    .fh-map{top:calc(72px + env(safe-area-inset-top,0px));right:10px;width:110px;height:110px}
     .fh-who{flex:1 1 auto;padding:8px 10px}
     .fh-who b{font-size:18px}
     .fh-btn{padding:0 11px;font-size:12px;letter-spacing:.08em}
@@ -387,9 +408,27 @@
   <div class="fh-bar panel">
     <button type="button" class="fh-who" id="fh-swap"><b id="fh-name">Franco</b><span id="fh-room">Corredor</span></button>
     <button type="button" class="fh-btn fh-music" id="fh-music" aria-pressed="true" aria-label="Sonido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5h4l5.5 4.5v-14L7 9.5z" fill="currentColor"/><path class="wave" d="M15.5 8.8a4.5 4.5 0 0 1 0 6.4M18.2 6.2a8.2 8.2 0 0 1 0 11.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-    <button type="button" class="fh-btn" id="fh-roof" aria-pressed="true"><span class="box"></span>Techo</button>
+    <button type="button" class="fh-btn fh-more" id="fh-more" aria-expanded="false" aria-controls="fh-panel" title="Más: hora, lluvia, mapa, foto" aria-label="Más opciones"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
     <button type="button" class="fh-btn fh-exit" id="fh-exit">Salir del juego</button>
+    <div class="fh-panel panel" id="fh-panel" hidden>
+      <p class="sec-h">Hora</p>
+      <div class="fh-hours">
+        <button type="button" data-h="7"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 6v3M5 11l1.8 1.4M19 11l-1.8 1.4"/></svg>Mañana</button>
+        <button type="button" data-h="12"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>Mediodía</button>
+        <button type="button" data-h="17.5"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 13v-4M9.5 10.5 12 13l2.5-2.5"/></svg>Tarde</button>
+        <button type="button" data-h="20.5"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Noche</button>
+      </div>
+      <div class="fh-opts">
+        <button type="button" class="fh-opt" id="fh-time" aria-pressed="false"><span class="box"></span>Que pase el tiempo</button>
+        <button type="button" class="fh-opt" id="fh-rain" aria-pressed="false"><span class="box"></span>Lluvia</button>
+        <button type="button" class="fh-opt" id="fh-map" aria-pressed="true"><span class="box"></span>Mapa</button>
+        <button type="button" class="fh-opt" id="fh-roof" aria-pressed="true"><span class="box"></span>Techo</button>
+      </div>
+      <button type="button" class="fh-photo" id="fh-photo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Tomar foto</button>
+    </div>
   </div>
+  <canvas class="fh-map" id="fh-minimap" width="280" height="280" aria-label="Mapa: el niño es la flecha"></canvas>
+  <div class="fh-flash" id="fh-flash"></div>
   <div class="stick stick-move" id="stick-move" role="img" aria-label="Joystick para caminar"><span class="stick-lbl">Caminar</span><i class="knob"></i></div>
   <div class="stick stick-look" id="stick-look" role="img" aria-label="Joystick para mirar"><span class="stick-lbl">Mirar</span><i class="knob"></i></div>
   <div class="acts">
@@ -400,7 +439,7 @@
       <button type="button" class="act act-main" id="act-jump" title="Saltar (espacio)" aria-label="Saltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V5M6.5 10.5 12 5l5.5 5.5M5 21h14"/></svg></button>
     </div>
   </div>
-  <p class="fh-keys">WASD o flechas: caminar · Shift: correr · Espacio: saltar · Q: saludar · E: usar · P: pelota · M: sonido · Esc: salir</p>
+  <p class="fh-keys">WASD o flechas: caminar · Shift: correr · Espacio: saltar · Q: saludar · E: usar · P: pelota · F: foto · M: sonido · Esc: salir</p>
 </div>
 <div class="fallback" id="fallback" hidden><p>No se pudo iniciar el visor 3D. Abre la página en un navegador con WebGL activado (Chrome, Edge, Firefox o Safari recientes).</p></div>
 
@@ -1562,7 +1601,7 @@
   let losaY = 0, losaMid = [0, 0], stepRoom = 0, losaStepBox = [0, 0, 0, 0];   // losaStepBox: [x0, x1, z0, z1] de las gradas, para Franco
   // Para el juego: las gradas del costado (n escalones de huella tr que llegan a yW), las del frente de la casa (LF, en el
   // plano) y los postes del techo de la losa. fitLosaFront acomoda las gradas del frente cuando se mueve la casa
-  let LS = { n: 0, tr: 0.3, yW: 0 }, LF = { x0: 0, x1: 0, y0: 0, depth: 0, n: 3 }, losaPosts = [], losaCols = [], losaFront = null, fitLosaFront = () => {};
+  let LS = { n: 0, tr: 0.3, yW: 0 }, LF = { x0: 0, x1: 0, y0: 0, depth: 0, n: 3 }, losaPosts = [], losaCols = [], losaPoly = [], losaFront = null, fitLosaFront = () => {};
   {
     const conc = std({ color: 0xBEB9B1, map: T_concrete, roughness: .95 });
     const wood = std({ color: 0x9A6B3C, roughness: .7 });
@@ -1571,6 +1610,7 @@
     const shapeOf = q => new THREE.Shape(q.map(([x, z]) => new THREE.Vector2(x, -z)));
     // Planta de la losa: el boquete hasta la cara de atrás del muro, menos la franja abierta de la izquierda
     const poly = clipIn(clipIn(LOT, ([x, z]) => BOQ.depth + BOQ.wall - vOf(x, z)), ([x, z]) => -eOf(x, z) - LEFT.open);
+    losaPoly = poly;
     const cen = poly.reduce((a, [x, z]) => [a[0] + x / poly.length, a[1] + z / poly.length], [0, 0]);
     losaMid = cen;
     // El piso del garaje es un plano, así que su punto más alto cae en un vértice
@@ -1876,7 +1916,8 @@
     if (h < 6) return 'madrugada'; if (h >= 18.75) return 'noche'; if (h < 7) return 'amanecer';
     if (h < 11.5) return 'mañana'; if (h < 13.5) return 'mediodía'; if (h < 17.25) return 'tarde'; return 'atardecer';
   }
-  let lastHour = 10;
+  let lastHour = 10, rainK = 0;                               // rainK: cuánto llueve (juego), de 0 a 1
+  const rainTop = new THREE.Color(0x7D8891), rainBot = new THREE.Color(0xA3ACB2);
   function applyHour(h) {
     const t = (h - 6) / 12 * Math.PI, s = Math.sin(t);
     const day = smooth(-0.1, 0.28, s);
@@ -1888,8 +1929,10 @@
     cA.copy(cDayTop).lerp(cGoldTop, golden); cB.copy(cDayBot).lerp(cGoldBot, golden);
     skyU.top.value.copy(cNightTop).lerp(cA, 1 - night);
     skyU.bottom.value.copy(cNightBot).lerp(cB, 1 - night);
-    scene.fog.color.copy(skyU.bottom.value);
-    hemi.intensity = 0.16 + 0.42 * day; hemi.color.copy(hemiNight).lerp(hemiDay, day);
+    skyU.top.value.lerp(rainTop, 0.7 * rainK * (1 - night)); skyU.bottom.value.lerp(rainBot, 0.7 * rainK * (1 - night));
+    sun.intensity *= 1 - 0.75 * rainK;
+    scene.fog.color.copy(skyU.bottom.value); scene.fog.near = 45 - 28 * rainK; scene.fog.far = 150 - 70 * rainK;
+    hemi.intensity = (0.16 + 0.42 * day) * (1 - 0.25 * rainK); hemi.color.copy(hemiNight).lerp(hemiDay, day);
     amb.intensity = 0.05 + 0.07 * day;
     starMat.opacity = night * 0.9; stars.visible = night > 0.02;
     M.glass.emissiveIntensity = night * 0.85; M.glass.opacity = 0.42 + 0.4 * night;
@@ -3157,6 +3200,7 @@
     if (!fr.on) return;
     if (e.code === 'Escape') { setView(fr.prev); return; }
     if (e.code === 'KeyM' && !e.repeat) { toggleMusic(); return; }
+    if (e.code === 'KeyF' && !e.repeat) { takePhoto(); return; }
     if (/^(Key[WASD]|Arrow|Shift)/.test(e.code)) { keys.add(e.code); if (e.code.startsWith('Arrow')) e.preventDefault(); }
   });
   window.addEventListener('keyup', e => keys.delete(e.code));
@@ -3220,7 +3264,7 @@
       fr.yawT = Math.atan2(fr.wantX, fr.wantY);
     }
     doorsStep(dt);
-    ballStep(dt); thingsStep(dt, t); dogStep(dt, t); playStepIdle(dt, t);
+    ballStep(dt); thingsStep(dt, t); dogStep(dt, t); playStepIdle(dt, t); worldStep(dt, t);
 
     // Cuerpo: gira hacia donde camina y, según lo que avanzó, mece las piernas (la rodilla se dobla cuando la pierna va hacia
     // adelante y el pie se mantiene casi plano) y los brazos (el codo se dobla más en el brazo que va adelante). Quieto,
@@ -4048,6 +4092,172 @@
     });
   }
 
+  /* ---------- juego: el mundo ---------- */
+  /* Pedido de la dueña, 2026-09-21. Un botón de opciones en la barra del juego abre un panel con la hora (mañana, mediodía,
+     tarde, noche), Que pase el tiempo (una hora cada 20 s), Lluvia, Mapa, Techo y Tomar foto. De día hay mariposas cerca de las
+     matas y pájaros que dan vueltas y cantan de vez en cuando; con lluvia o de noche se esconden */
+  const WORLD = { flow: false, rain: false, map: true, hourAcc: 0, chirpAt: 0, rainSrc: null };
+  // Lluvia: gotas (rayitas) en una caja alrededor de la cámara que caen a 9 m/s; bajo el techo de la casa o de la losa no se ven
+  const RAIN_N = 1400, rainPos = new Float32Array(RAIN_N * 6), rainGeo = new THREE.BufferGeometry();
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+  const rainLines = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xB4C6D4, transparent: true, opacity: .55, depthWrite: false }));
+  rainLines.frustumCulled = false; rainLines.visible = false; scene.add(rainLines);
+  const drops = Array.from({ length: RAIN_N }, () => [Math.random() * 20 - 10, Math.random() * 13 - 2, Math.random() * 20 - 10]);
+  const rq = new V3();
+  function underRoof(x, y, z) {
+    rq.set(x, 0, z).sub(houseOff).applyAxisAngle(UPY, -houseYaw);
+    if (state.roof && Math.abs(rq.x) < hw + 0.1 && Math.abs(rq.z) < hd + 0.1 && y < YR + 0.2) return true;
+    return state.techo && vOf(x, z) < BOQ.depth + BOQ.wall + 0.3 && sIn(x, z) > -0.3 && wOf(x, z) < 0 && eOf(x, z) < -LEFT.open + 0.3 && y < losaY + TECHO.high + 0.1;
+  }
+  function rainSound(on) {
+    if (WORLD.rainSrc) { try { WORLD.rainSrc.stop(); } catch (err) { /* ya estaba parado */ } WORLD.rainSrc = null; }
+    if (!on || !sfxOk()) return;
+    const { ctx } = MUSIC, n = ctx.createBufferSource(), lo = ctx.createBiquadFilter(), hi = ctx.createBiquadFilter(), g = ctx.createGain();
+    n.buffer = MUSIC.noise; n.loop = true; lo.type = 'lowpass'; lo.frequency.value = 3800; hi.type = 'highpass'; hi.frequency.value = 500; g.gain.value = 0.11;
+    n.connect(hi); hi.connect(lo); lo.connect(g); g.connect(MUSIC.fx); n.start(); WORLD.rainSrc = n;
+  }
+  // Mariposas: dos pares de alas que aletean, dando vueltas despacio cerca de las matas del lote (en el plano)
+  const bugs = [[-1.3, 4.6, 0xF28C28], [5.9, -2.8, 0xF4D03F], [1.4, -7.2, 0x5DADE2], [-0.6, 7.6, 0xF4F4F4], [3.3, -3.3, 0xF1948A]].map(([x, y, c], i) => {
+    const g = new THREE.Group(); g.visible = false; g.scale.setScalar(1.5); house.add(g);
+    const wingM = std({ color: c, roughness: .6, side: THREE.DoubleSide }), edge = std({ color: 0x1E1B1A, roughness: .6, side: THREE.DoubleSide });
+    const wing = new THREE.Shape(); wing.moveTo(0, 0); wing.bezierCurveTo(0.05, 0.05, 0.1, 0.045, 0.085, -0.005); wing.bezierCurveTo(0.08, -0.05, 0.03, -0.06, 0, 0);
+    const wings = [-1, 1].map(s => {
+      const w = new THREE.Group(); g.add(w);
+      const m = new THREE.Mesh(new THREE.ShapeGeometry(wing), wingM); m.rotation.x = -Math.PI / 2; m.scale.x = s; w.add(m);
+      const b = new THREE.Mesh(new THREE.ShapeGeometry(wing), edge); b.rotation.x = -Math.PI / 2; b.scale.set(s * 1.08, 1.08, 1); b.position.y = -0.001; w.add(b);
+      return w;
+    });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.05, 6), edge); body.rotation.x = Math.PI / 2; g.add(body);
+    return { g, wings, x, y, ph: i * 1.7, r: 0.8 + (i % 3) * 0.3 };
+  });
+  // Pájaros: una V que aletea, dando vueltas alto sobre el lote (en el mundo)
+  const birds = [0, 1, 2, 3].map(i => {
+    const g = new THREE.Group(); g.visible = false; scene.add(g);
+    const m = kidMat(0x2E2B2A, { roughness: .8 });
+    const wings = [-1, 1].map(s => { const w = new THREE.Group(); g.add(w); const b = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.01, 0.07), m); b.position.x = s * 0.11; w.add(b); return w; });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), m); body.scale.set(0.8, 0.8, 1.8); g.add(body);
+    return { g, wings, r: 5 + i * 1.8, h: 6 + i * 1.3, w: (i % 2 ? -1 : 1) * (0.18 + i * 0.03), ph: i * 1.6, cx: -2 + i, cz: -3 - i * 1.5 };
+  });
+  function chirp() {
+    if (!sfxOk()) return;
+    const { ctx } = MUSIC, t = ctx.currentTime + 0.01;
+    [0, 0.09, 0.2].forEach((d, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), t0 = t + d, f0 = 2600 + Math.random() * 1200;
+      o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f0 * (i === 2 ? 0.7 : 1.35), t0 + 0.07);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.05, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.08);
+      o.connect(g); g.connect(MUSIC.fx); o.start(t0); o.stop(t0 + 0.1);
+    });
+  }
+  function worldStep(dt, t) {
+    // El reloj: con Que pase el tiempo, una hora cada 20 s (de 5:30 a 20:30 y vuelve a empezar)
+    if (WORLD.flow) {
+      let h = lastHour + dt / 20; if (h > 20.5) h = 5.5;
+      WORLD.hourAcc += dt; lastHour = h;
+      if (WORLD.hourAcc > 0.2) { WORLD.hourAcc = 0; setHour(h); }
+    }
+    // Lluvia: sube y baja poco a poco; mientras cambia se vuelve a pintar el cielo
+    const k = rainK + ((WORLD.rain ? 1 : 0) - rainK) * Math.min(1, dt * 0.8);
+    const target = WORLD.rain ? 1 : 0;
+    if (Math.abs(k - rainK) > 0.002) { rainK = k; applyHour(lastHour); } else if (rainK !== target) { rainK = target; applyHour(lastHour); }
+    rainLines.visible = rainK > 0.02;
+    if (rainLines.visible) {
+      const c = camera.position, n = Math.floor(RAIN_N * rainK);
+      for (let i = 0; i < RAIN_N; i++) {
+        const d = drops[i]; d[1] -= 9 * dt;
+        if (d[1] < -3) { d[0] = Math.random() * 20 - 10; d[1] = 10 + Math.random() * 2; d[2] = Math.random() * 20 - 10; }
+        const x = c.x + d[0], y = c.y + d[1], z = c.z + d[2], j = i * 6;
+        if (i >= n || underRoof(x, y, z)) { rainPos[j + 1] = rainPos[j + 4] = -500; continue; }
+        rainPos[j] = x; rainPos[j + 1] = y; rainPos[j + 2] = z; rainPos[j + 3] = x + 0.015; rainPos[j + 4] = y + 0.32; rainPos[j + 5] = z + 0.01;
+      }
+      rainGeo.attributes.position.needsUpdate = true;
+    }
+    // Mariposas y pájaros: de día y sin lluvia
+    const day = 1 - smooth(-0.2, 0.02, Math.sin((lastHour - 6) / 12 * Math.PI)) < 0.5 && rainK < 0.3;
+    bugs.forEach(b => {
+      b.g.visible = day;
+      if (!day) return;
+      const a = t * 0.45 + b.ph, x = b.x + Math.sin(a) * b.r + Math.sin(a * 2.3) * 0.25, y = b.y + Math.cos(a * 0.8) * b.r * 0.8;
+      const h = floorAt(x, y) + 0.95 + Math.sin(a * 1.7) * 0.3;
+      b.g.position.set(X(x), h, Z(y));
+      b.g.rotation.y = Math.atan2(Math.cos(a), -Math.sin(a * 0.8));
+      const flap = 0.2 + 1.0 * Math.abs(Math.sin(t * 16 + b.ph));
+      b.wings[0].rotation.z = flap; b.wings[1].rotation.z = -flap;
+    });
+    birds.forEach(b => {
+      b.g.visible = day;
+      if (!day) return;
+      const a = t * b.w + b.ph;
+      b.g.position.set(b.cx + Math.cos(a) * b.r, b.h + Math.sin(t * 0.3 + b.ph) * 0.8, b.cz + Math.sin(a) * b.r);
+      b.g.rotation.set(0, -a + (b.w > 0 ? Math.PI : 0), 0);
+      const flap = Math.sin(t * 9 + b.ph) * 0.6;
+      b.wings[0].rotation.z = flap; b.wings[1].rotation.z = -flap;
+    });
+    if (day && t > WORLD.chirpAt) { if (WORLD.chirpAt) chirp(); WORLD.chirpAt = t + 5 + Math.random() * 8; }
+    if (WORLD.map) drawMap();
+  }
+  // Pone la hora (y mueve el control de hora del panel de Capas, para que queden iguales)
+  function setHour(h) { $('#hour').value = h; applyHour(h); }
+  // Foto: dibuja un cuadro, lo guarda como PNG (sin los botones del juego), con un destello y el ruido de la cámara
+  function takePhoto() {
+    renderer.render(scene, camera);
+    const a = document.createElement('a'), d = new Date(), p2 = n => String(n).padStart(2, '0');
+    a.href = canvas.toDataURL('image/png');
+    a.download = kid.name.toLowerCase() + '-en-la-casa-' + d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '-' + p2(d.getHours()) + p2(d.getMinutes()) + '.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    const fl = $('#fh-flash'); fl.classList.add('is-on'); requestAnimationFrame(() => requestAnimationFrame(() => fl.classList.remove('is-on')));
+    if (sfxOk()) { const t = MUSIC.ctx.currentTime + 0.005; latch(t, 0.4); burst(t + 0.04, 0.25, 0.12, 'bandpass', 2500, 0.8); latch(t + 0.13, 0.3); }
+  }
+  /* Mapa: centrado en el niño y girado con la cámara (lo que tiene enfrente queda arriba). El lote, los cuartos, las paredes y los
+     muebles, la losa, la pelota (roja), Marshall (café) y el niño (la flecha) */
+  const mapCv = $('#fh-minimap'), mapG = mapCv.getContext('2d'), mq = new V3();
+  const toPlan = (x, z) => { mq.set(x, 0, z).sub(houseOff).applyAxisAngle(UPY, -houseYaw); return [mq.x + W / 2, mq.z + D / 2]; };
+  let mapTick = 0;
+  function drawMap() {
+    if ((mapTick = (mapTick + 1) % 2)) return;                 // cada dos cuadros alcanza
+    const g = mapG, S = 280, k = 17, css = getComputedStyle(document.documentElement);
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, S, S);
+    g.fillStyle = css.getPropertyValue('--paper').trim() || '#FBFAF6'; g.fillRect(0, 0, S, S);
+    g.save(); g.translate(S / 2, S / 2); g.rotate(fr.camYaw); g.scale(k, k); g.translate(-fr.x, -fr.y);
+    g.fillStyle = '#E4CDB8'; g.strokeStyle = '#E0241B'; g.lineWidth = 0.12;               // el lote
+    g.beginPath(); LOT.forEach(([x, z], i) => { const [px, py] = toPlan(x, z); i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.closePath(); g.fill(); g.stroke();
+    if (state.losa && losaPoly.length) {                                                  // la losa
+      g.fillStyle = '#C9C4BC'; g.beginPath(); losaPoly.forEach(([x, z], i) => { const [px, py] = toPlan(x, z); i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.closePath(); g.fill();
+    }
+    g.fillStyle = '#F4F1EA'; ROOMS.forEach(r => g.fillRect(r.rect[0], r.rect[2], r.rect[1] - r.rect[0], r.rect[3] - r.rect[2]));
+    OBST.forEach(o => {
+      if (o[4] === 'furn' && !state.furn) return;
+      g.fillStyle = o[4] === 'wall' ? '#3A3E42' : o[4] === 'fix' ? '#6D8FB8' : '#B9A58E';
+      g.fillRect(o[0], o[2], o[1] - o[0], o[3] - o[2]);
+    });
+    const dot = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+    if (ball.visible) dot(BALL.x, BALL.y, 0.26, '#E53935');
+    if (dog.visible) dot(DOG.x, DOG.y, 0.3, '#8E5A2B');
+    g.translate(fr.x, fr.y); g.rotate(-fr.yaw + Math.PI); g.scale(1.6, 1.6);                                  // el niño: una flecha hacia donde mira
+    g.fillStyle = '#A45F2C'; g.strokeStyle = '#fff'; g.lineWidth = 0.08;
+    g.beginPath(); g.moveTo(0, -0.55); g.lineTo(0.38, 0.4); g.lineTo(0, 0.22); g.lineTo(-0.38, 0.4); g.closePath(); g.fill(); g.stroke();
+    g.restore();
+  }
+  // Panel de opciones
+  const morePanel = $('#fh-panel'), moreBtn = $('#fh-more');
+  const showMore = on => { morePanel.hidden = !on; moreBtn.setAttribute('aria-expanded', String(on)); };
+  moreBtn.addEventListener('click', () => showMore(morePanel.hidden));
+  document.addEventListener('pointerdown', e => { if (!morePanel.hidden && !e.target.closest('.fh-bar')) showMore(false); });
+  morePanel.querySelectorAll('[data-h]').forEach(b => b.addEventListener('click', () => { WORLD.flow = false; $('#fh-time').setAttribute('aria-pressed', 'false'); setHour(parseFloat(b.dataset.h)); }));
+  const optToggle = (id, key, fn) => $(id).addEventListener('click', () => {
+    WORLD[key] = !WORLD[key]; $(id).setAttribute('aria-pressed', String(WORLD[key])); if (fn) fn(WORLD[key]);
+  });
+  optToggle('#fh-time', 'flow');
+  optToggle('#fh-rain', 'rain', on => rainSound(on));
+  optToggle('#fh-map', 'map', on => { mapCv.hidden = !on; });
+  $('#fh-photo').addEventListener('click', () => { showMore(false); takePhoto(); });
+  // Al salir del juego: sin lluvia, sin reloj corriendo y sin bichos
+  function resetWorld() {
+    WORLD.flow = WORLD.rain = false; ['#fh-time', '#fh-rain'].forEach(id => $(id).setAttribute('aria-pressed', 'false'));
+    rainSound(false); rainK = 0; rainLines.visible = false; applyHour(lastHour);
+    bugs.forEach(b => { b.g.visible = false; }); birds.forEach(b => { b.g.visible = false; });
+    showMore(false);
+  }
+
   const hud = $('#play-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof'), swapBtn = $('#fh-swap');
   const playBtn = $('#v-play'), playMenu = $('#play-menu');
   function playFov() { camera.fov = camera.aspect < 1 ? 70 : 60; camera.updateProjectionMatrix(); }
@@ -4076,13 +4286,14 @@
       ballHome(4.3, 5.0); ball.visible = true;                    // la pelota espera en la sala
       dog.visible = true; dogHome();                               // Marshall llega con el niño
       playG.visible = true;                                        // la hamaca y el tobogán del patio
+      $('#fh-minimap').hidden = !WORLD.map;
       doorLimits();
       DOORS.forEach(d => { d.th = d.w = d.hold = d.pull = 0; d.leaf.rotation.y = d.rot0; });
       fr.fly = reduceMotion ? null : { p0: camera.position.clone(), t0: controls.target.clone(), start: performance.now() };
       playFov();
       canvas.focus({ preventScroll: true });
     } else {
-      resetThings(); dog.visible = playG.visible = false; kid.root.visible = false; playMusic(null);
+      resetThings(); resetWorld(); dog.visible = playG.visible = false; kid.root.visible = false; playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
       camera.fov = 42; camera.updateProjectionMatrix();
