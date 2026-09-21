@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Casa Modelo 1</title>
+<title>Casa Lizano Vega</title>
 <link rel="stylesheet" href="fonts/fonts.css">
 <style>
   :root{
@@ -156,23 +156,54 @@
   .lbl.dim.nb{border-color:#F2A516;box-shadow:inset 0 -2px 0 #F2A516}
   .lbl.dim{background:var(--paper);color:var(--ink);padding:3px 5px 2px;font:600 12px/1 var(--display);letter-spacing:.03em;font-variant-numeric:tabular-nums;border:1px solid var(--rule)}
 
+  .tb-more,.sheet-grip,.sheet-tabs{display:none}
+
   .fallback{position:fixed;inset:0;display:grid;place-items:center;padding:24px 16px;text-align:center;color:var(--ink-2)}
 
   @media (max-width: 1100px){ .hint{display:none} }
+  /* Teléfono: el cajetín queda en una sola línea arriba y todos los controles en una hoja que sube desde abajo.
+     Las vistas y las pestañas siempre se ven; el cuerpo solo aparece con una pestaña escogida (data-tab en .rail) */
   @media (max-width: 800px){
-    .tb{left:16px;right:16px;width:auto;max-height:46%}
-    .tb-head{padding:10px 12px 9px}
-    .tb h1{font-size:26px;margin:4px 0 0}
+    .tb{top:0;left:0;right:0;width:auto;max-height:70%;border-width:0 0 1px}
+    .tb-head{display:flex;align-items:center;gap:10px;padding:9px 14px calc(9px + env(safe-area-inset-top,0px));border-bottom:0}
+    .tb.is-open .tb-head{border-bottom:1px solid var(--rule-strong)}
+    .tb h1{font-size:19px;margin:0;flex:1;min-width:0;letter-spacing:.04em}
     .tb-head .eyebrow,.tb-sub{display:none}
+    .tb-more{display:flex;align-items:center;gap:9px;padding:6px 0 6px 8px;background:none;border:0;color:var(--ink);cursor:pointer}
+    .tb-more b{font:600 16px/1 var(--display);font-variant-numeric:tabular-nums}
+    .tb-grid,.tb .spaces{display:none}
+    .tb.is-open .tb-grid{display:grid;border-bottom:0}
+    .tb.is-open .tb-more .chev{transform:translateY(2px) rotate(-135deg)}
     .tb-grid>div{padding:6px 10px 7px}
     .tb-grid dd{font-size:18px}
-    .tb-grid .extra{display:none}
-    .spaces>summary{padding:10px 12px}
-    .rail{top:auto;left:16px;right:16px;width:auto;align-items:stretch;justify-content:flex-end;gap:8px;max-height:58%}
-    .views button{flex:1;padding:11px 4px;font-size:13px;letter-spacing:.08em}
-    .controls{flex:0 1 auto}
-    .controls>summary{padding:10px 12px}
-    .ctl-body{padding:2px 12px 12px;gap:12px}
+
+    .rail{top:auto;left:0;right:0;bottom:0;width:auto;gap:0;align-items:stretch;justify-content:flex-end;
+      background:var(--paper);border-top:1px solid var(--rule-strong);box-shadow:var(--shadow);pointer-events:auto;
+      padding-bottom:env(safe-area-inset-bottom,0px)}
+    .views{border:0;border-bottom:1px solid var(--rule);box-shadow:none}
+    .views button{flex:1;padding:12px 2px;font-size:12px;letter-spacing:.06em}
+    .sheet-grip{display:block;padding:7px 0 5px;cursor:grab;touch-action:none}
+    .sheet-grip span{display:block;width:44px;height:4px;margin:0 auto;border-radius:99px;background:var(--rule-strong)}
+    .sheet-tabs{display:flex}
+    .sheet-tabs button{flex:1;padding:9px 2px 11px;background:none;border:0;border-top:2px solid transparent;
+      font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);cursor:pointer}
+    .sheet-tabs button[aria-pressed="true"]{color:var(--ink);border-top-color:var(--accent)}
+
+    .controls{flex:0 1 auto;border:0;box-shadow:none;max-height:46vh;overflow:auto;border-top:1px solid var(--rule)}
+    .controls>summary{display:none}
+    .ctl-body{padding:12px 14px 16px;gap:14px}
+    /* solo se ve la sección de la pestaña escogida; sin pestaña, la hoja queda cerrada */
+    .ctl-body>*{display:none}
+    .rail:not([data-tab]) .controls{display:none}
+    .rail[data-tab="spaces"] #spaces,
+    .rail[data-tab="layers"] #sec-layers,.rail[data-tab="layers"] #sec-hour,
+    .rail[data-tab="colors"] #paint-box,.rail[data-tab="move"] #move-box{display:block}
+    .ctl-body #spaces,.ctl-body .paint-box{border-top:0}
+    .ctl-body>details>summary{display:none}
+    .ctl-body .rooms{padding:0}
+    .ctl-body .room-btn,.ctl-body .room-desc{padding-left:2px}
+    .ctl-body .room-desc{padding-left:24px}
+    .move-row label{letter-spacing:.1em}
   }
   @media (prefers-reduced-motion: reduce){ .chev,.hint{transition:none} }
 </style>
@@ -185,10 +216,11 @@
 <header class="tb panel">
   <div class="tb-head">
     <p class="sec-h eyebrow">Vivienda prefabricada · una planta</p>
-    <h1>Casa Modelo 1</h1>
+    <h1>Casa Lizano Vega</h1>
     <p class="tb-sub">Baño al centro, dos dormitorios y sala, comedor y cocina en un mismo espacio.</p>
+    <button type="button" class="tb-more" id="tb-more" aria-expanded="false" aria-controls="tb-grid"><b>42 m&sup2;</b><i class="chev"></i></button>
   </div>
-  <dl class="tb-grid">
+  <dl class="tb-grid" id="tb-grid">
     <div><dt>Frente</dt><dd>6.00<small>m</small></dd></div>
     <div><dt>Fondo</dt><dd>7.00<small>m</small></dd></div>
     <div><dt>Área</dt><dd>42.00<small>m²</small></dd></div>
@@ -213,10 +245,17 @@
     <button type="button" id="v-planta" data-view="planta" aria-pressed="false">Planta</button>
     <button type="button" id="v-lote" data-view="lote" aria-pressed="false">Lote</button>
   </nav>
+  <div class="sheet-grip" id="sheet-grip"><span></span></div>
+  <div class="sheet-tabs" id="sheet-tabs">
+    <button type="button" data-tab="spaces" aria-pressed="false">Espacios</button>
+    <button type="button" data-tab="layers" aria-pressed="false">Capas</button>
+    <button type="button" data-tab="colors" aria-pressed="false">Colores</button>
+    <button type="button" data-tab="move" aria-pressed="false">Mover</button>
+  </div>
   <details class="controls panel" id="controls" open>
     <summary><span class="sec-h">Capas, luz y color</span><i class="chev"></i></summary>
-    <div class="ctl-body">
-      <fieldset>
+    <div class="ctl-body" id="ctl-body">
+      <fieldset id="sec-layers">
         <legend class="sec-h">Capas</legend>
         <div class="layers">
           <label class="tog"><input type="checkbox" id="t-roof" checked><span class="box"></span>Techo</label>
@@ -231,7 +270,7 @@
         </div>
         <p class="note" id="names-note">Los nombres de los espacios se ven al quitar el techo.</p>
       </fieldset>
-      <div class="hour">
+      <div class="hour" id="sec-hour">
         <div class="hour-row"><label class="sec-h" for="hour">Hora del día</label><output id="hour-out" for="hour">10:00<span>mañana</span></output></div>
         <div class="slider">
           <input type="range" id="hour" min="5.5" max="20.5" step="0.25" value="10">
@@ -1951,7 +1990,47 @@
   window.addEventListener('resize', resize);
   resize();
 
-  if (window.matchMedia('(max-width: 800px)').matches) { $('#controls').open = false; $('#spaces').open = false; }
+  /* Teléfono: los controles se pasan a una hoja que sube desde abajo (pedido de la dueña, 2026-09-21). Son los mismos bloques
+     del panel de la computadora, movidos a la hoja y convertidos en pestañas —Espacios, Capas (con la hora del día), Colores y
+     Mover—, así que hay un solo juego de controles y nada se duplica. Sin pestaña escogida la hoja queda cerrada y solo se ven
+     las vistas, la agarradera y las pestañas. Al volver a pantalla grande todo regresa a su sitio */
+  const mob = window.matchMedia('(max-width: 800px)');
+  const rail = $('.rail'), tb = $('.tb'), ctlBody = $('#ctl-body'), spacesBox = $('#spaces'), tabs = $('#sheet-tabs');
+  let lastTab = 'layers';
+  function setTab(t) {
+    if (t) { rail.dataset.tab = t; lastTab = t; } else delete rail.dataset.tab;
+    tabs.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === t)));
+  }
+  function applyLayout() {
+    const m = mob.matches, paint = $('#paint-box'), move = $('#move-box');
+    if (m && spacesBox.parentElement !== ctlBody) ctlBody.insertBefore(spacesBox, ctlBody.firstChild);
+    if (!m && spacesBox.parentElement !== tb) tb.appendChild(spacesBox);
+    $('#controls').open = spacesBox.open = true;
+    paint.open = move.open = m;                                  // en la hoja no llevan resumen: van siempre abiertos
+    if (!m) { setTab(null); tb.classList.remove('is-open'); $('#tb-more').setAttribute('aria-expanded', 'false'); }
+  }
+  mob.addEventListener('change', applyLayout);
+  applyLayout();
+  tabs.querySelectorAll('button').forEach(b => b.addEventListener('click', () => setTab(rail.dataset.tab === b.dataset.tab ? null : b.dataset.tab)));
+  $('#tb-more').addEventListener('click', () => {
+    const on = !tb.classList.contains('is-open');
+    tb.classList.toggle('is-open', on); $('#tb-more').setAttribute('aria-expanded', String(on));
+  });
+  // Al escoger un espacio la cámara vuela hasta él, así que la hoja se cierra para poder verlo
+  $('#rooms').addEventListener('click', () => { if (mob.matches) setTab(null); });
+  // La agarradera: se toca para abrir la última pestaña o cerrar la hoja, y también se jala
+  const grip = $('#sheet-grip');
+  let drag = null;
+  grip.addEventListener('pointerdown', e => { drag = { y: e.clientY }; grip.setPointerCapture?.(e.pointerId); });
+  grip.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dy = e.clientY - drag.y;
+    if (Math.abs(dy) < 28) return;
+    setTab(dy < 0 ? (rail.dataset.tab || lastTab) : null);
+    drag = null;
+  });
+  grip.addEventListener('pointerup', () => { if (drag) setTab(rail.dataset.tab ? null : lastTab); drag = null; });
+  grip.addEventListener('pointercancel', () => { drag = null; });
 
   const start = viewPose('exterior');
   if (reduceMotion) { camera.position.copy(start.p); controls.target.copy(start.t); }
