@@ -2885,7 +2885,7 @@
 
   const FR_R = 0.14;                                          // radio con que choca: los hombros de un niño de 5 años
   const LOOK_H = 1.15;                                        // la cámara mira un poco sobre su cabeza, para que él quede abajo
-  const fr = { on: false, who: 'franco', blinkAt: 0, blinkEnd: 0, jz: 0, jv: 0, waveEnd: 0, speed: 0, pose: null, mood: 'normal', moodEnd: 0, bump: 0, spinEnd: 0, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
+  const fr = { on: false, who: 'franco', blinkAt: 0, blinkEnd: 0, jz: 0, jv: 0, waveEnd: 0, petEnd: 0, speed: 0, pose: null, mood: 'normal', moodEnd: 0, bump: 0, spinEnd: 0, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
     wantX: 0, wantY: 0, prev: 'exterior', fly: null, room: '', look: new V3() };
   const clampPitch = p => Math.max(-0.12, Math.min(1.25, p));
   const inHouse = (x, y) => x >= -0.08 && x <= W + 0.08 && y >= -0.08 && y <= D + 0.08;
@@ -2920,16 +2920,16 @@
     return WOBST.every(([ox, oz, or]) => Math.hypot(p.x - ox, p.z - oz) > or + r);
   }
   // Lo saca de las paredes, las columnas y los muebles en los que quedó metido
-  function pushOut(x, y) {
+  function pushOut(x, y, r = FR_R) {
     for (let it = 0; it < 3; it++) for (const o of OBST) {
       if (o[4] === 'furn' && !state.furn) continue;
       const qx = Math.max(o[0], Math.min(x, o[1])), qy = Math.max(o[2], Math.min(y, o[3]));
       const dx = x - qx, dy = y - qy, d2 = dx * dx + dy * dy;
-      if (d2 >= FR_R * FR_R) continue;
-      if (d2 > 1e-12) { const d = Math.sqrt(d2), k = (FR_R - d) / d; x += dx * k; y += dy * k; }
+      if (d2 >= r * r) continue;
+      if (d2 > 1e-12) { const d = Math.sqrt(d2), k = (r - d) / d; x += dx * k; y += dy * k; }
       else {                                                  // el centro quedó adentro: sale por el lado más cercano
         const m = [x - o[0], o[1] - x, y - o[2], o[3] - y], i = m.indexOf(Math.min(...m));
-        if (i === 0) x = o[0] - FR_R; else if (i === 1) x = o[1] + FR_R; else if (i === 2) y = o[2] - FR_R; else y = o[3] + FR_R;
+        if (i === 0) x = o[0] - r; else if (i === 1) x = o[1] + r; else if (i === 2) y = o[2] - r; else y = o[3] + r;
       }
     }
     return [x, y];
@@ -3193,7 +3193,7 @@
       fr.yawT = Math.atan2(fr.wantX, fr.wantY);
     }
     doorsStep(dt);
-    ballStep(dt); thingsStep(dt, t);
+    ballStep(dt); thingsStep(dt, t); dogStep(dt, t);
 
     // Cuerpo: gira hacia donde camina y, según lo que avanzó, mece las piernas (la rodilla se dobla cuando la pierna va hacia
     // adelante y el pie se mantiene casi plano) y los brazos (el codo se dobla más en el brazo que va adelante). Quieto,
@@ -3235,6 +3235,9 @@
     const wv = t < fr.waveEnd ? Math.min(1, (fr.waveEnd - t) / 0.25, (t - fr.waveEnd + 1.6) / 0.25) : 0;
     kid.arms[0].rotation.z = -0.1 - 2.55 * wv; kid.elbows[0].rotation.z = Math.sin(t * 14) * 0.5 * wv;
     if (wv) { kid.arms[0].rotation.x = -0.25 * wv; kid.elbows[0].rotation.x = -0.35 * wv; }
+    // Acariciar a Marshall: se inclina y le pasa la mano izquierda
+    const pet = t < fr.petEnd ? Math.min(1, (fr.petEnd - t) / 0.3, (t - fr.petEnd + 1.8) / 0.3) : 0;
+    if (pet) { kid.body.rotation.x = 0.4 * pet; kid.arms[1].rotation.x = -0.9 * pet + Math.sin(t * 9) * 0.15 * pet; kid.elbows[1].rotation.x = -0.25 * pet; }
     fr.h += (floorAt(fr.x, fr.y) - fr.h) * Math.min(1, dt * 14);
     if (fr.pose) applyPose(t);
     else {
@@ -3735,6 +3738,156 @@
     { d: nearPoint(0.95, 1.85), r: 0.5, label: () => 'Ponerse ' + OUTFIT_NAME[nextOutfit()], icon: () => 'shirt', act: changeOutfit },   // ropero del dormitorio 1
     { d: nearPoint(2.26, 6.05), r: 0.45, label: () => 'Ponerse ' + OUTFIT_NAME[nextOutfit()], icon: () => 'shirt', act: changeOutfit });  // ropero del dormitorio 2
 
+  /* ---------- juego: la mascota ---------- */
+  /* Marshall (pedido de la dueña, 2026-09-21): el perrito de la casa, un chihuahua blanco y negro. Sigue al niño unos pasos
+     atrás, mueve la cola, se sienta cuando él se queda quieto y lo mira con la cabeza ladeada, corre detrás de la pelota cuando
+     la patean y la empuja con el hocico, y ladra de vez en cuando. Choca con las paredes y los muebles (con su propio radio),
+     empuja las puertas, no sube ni baja más de una grada y, si se queda trabado, llega corriendo por detrás del niño. De cerca,
+     el botón de acción (una huellita) lo acaricia. Cuelga de house, como los niños; su posición (DOG.x, DOG.y) va en el plano */
+  const DOG_R = 0.1;
+  const dog = new THREE.Group(); dog.visible = false; house.add(dog);
+  const dogBody = new THREE.Group(); dog.add(dogBody);
+  const DOG = { x: 4.4, y: 6.6, h: FL, yaw: Math.PI, phase: 0, amp: 0, sit: 0, chase: 0, barkAt: 0, far: 0, pet: 0, lick: 0 };
+  {
+    // Chihuahua de unos 0.22 m a la cruz: lomo, cabeza y orejas negras; pecho, panza, patas, la franja de la cara y el hocico
+    // blancos. Cabeza de manzana, ojos grandes, orejas grandes y paradas, patas delgadas y la cola enroscada hacia arriba
+    const blackF = kidMat(0x1E1B1A, { roughness: .8 }), white = kidMat(0xF3F0EA, { roughness: .85 }), pinkM = kidMat(0xE8A0A8, { roughness: .6 });
+    const eyeM = kidMat(0x0B0909, { roughness: .12 }), part = (g, m, x, y, z, p = dogBody) => kidPart(g, m, x, y, z, p);
+    const ball = r => new THREE.SphereGeometry(r, 18, 14);
+    part(ball(1), blackF, 0, 0.175, -0.01).scale.set(0.075, 0.07, 0.13);                  // lomo
+    part(ball(1), white, 0, 0.15, 0.015).scale.set(0.06, 0.05, 0.105);                    // panza
+    part(ball(1), white, 0, 0.2, 0.095).scale.set(0.058, 0.07, 0.06);                     // pecho
+    part(new THREE.CylinderGeometry(0.032, 0.04, 0.08, 12), blackF, 0, 0.245, 0.115).rotation.x = 0.5;   // cuello
+    const collar = part(new THREE.TorusGeometry(0.036, 0.008, 8, 18), kidMat(0xC0392B, { roughness: .5 }), 0, 0.24, 0.12);
+    collar.rotation.x = Math.PI / 2 + 0.5;
+    part(new THREE.CylinderGeometry(0.01, 0.01, 0.003, 10), kidMat(0xD4A93A, { roughness: .3, metalness: .6 }), 0, 0.212, 0.152).rotation.x = Math.PI / 2 + 0.3;
+    const head = new THREE.Group(); head.position.set(0, 0.29, 0.15); dogBody.add(head);
+    part(ball(0.066), blackF, 0, 0, 0, head).scale.set(1, 0.95, 0.95);                   // cabeza de manzana
+    part(ball(1), white, 0, 0.004, 0.05, head).scale.set(0.024, 0.05, 0.02);              // franja blanca de la cara
+    part(ball(1), white, 0, -0.024, 0.058, head).scale.set(0.03, 0.024, 0.036);           // hocico corto
+    part(ball(0.009), eyeM, 0, -0.016, 0.093, head);                                       // nariz
+    [-1, 1].forEach(s => {
+      part(ball(0.015), eyeM, s * 0.031, 0.012, 0.047, head);                             // ojos grandes
+      part(ball(0.004), kidMat(0xffffff, { emissive: 0xffffff, emissiveIntensity: .5 }), s * 0.031 - 0.005, 0.018, 0.061, head);
+      const ear = new THREE.Group(); ear.position.set(s * 0.042, 0.05, -0.008); ear.rotation.set(-0.15, 0, -s * 0.5); head.add(ear);
+      part(new THREE.ConeGeometry(0.03, 0.085, 4), blackF, 0, 0.038, 0, ear).scale.z = 0.35;   // orejas grandes y paradas
+      part(new THREE.ConeGeometry(0.018, 0.06, 3), pinkM, 0, 0.034, 0.008, ear).scale.z = 0.3;
+    });
+    const tongue = part(ball(1), kidMat(0xE57B8B, { roughness: .5 }), 0, -0.042, 0.07, head); tongue.scale.set(0.012, 0.004, 0.018);
+    const legs = [[-1, 0.075], [1, 0.075], [-1, -0.085], [1, -0.085]].map(([s, z]) => {   // patas delgadas, con la patita blanca
+      const g = new THREE.Group(); g.position.set(s * 0.042, 0.16, z); dogBody.add(g);
+      part(new THREE.CylinderGeometry(0.015, 0.012, 0.15, 8), z > 0 ? white : blackF, 0, -0.075, 0, g);
+      part(ball(0.016), white, 0, -0.152, 0.005, g).scale.set(1, 0.7, 1.2);
+      return g;
+    });
+    // Cola enroscada hacia arriba, negra con la punta blanca
+    const tail = new THREE.Group(); tail.position.set(0, 0.2, -0.13); dogBody.add(tail);
+    kidPart(lock([[0, 0, 0], [0, 0.05, -0.03], [0, 0.1, -0.02], [0, 0.12, 0.02], [0, 0.105, 0.05]], 0.012, 0x1E1B1A, 0xF3F0EA, 0.4, 16, 6),
+      std({ vertexColors: true, roughness: .8 }), 0, 0, 0, tail);
+    Object.assign(DOG, { head, legs, tail, tongueM: tongue });
+  }
+  ICONS.paw = '<circle cx="7" cy="9.5" r="1.8"/><circle cx="10.5" cy="6" r="1.8"/><circle cx="15" cy="6.3" r="1.8"/><circle cx="18.3" cy="10" r="1.7"/><path d="M8 17.5c0-3 2-5 4.5-5s4.5 2 4.5 5c0 2-1.6 2.5-2.8 2.2-1.1-.3-2.3-.3-3.4 0C9.6 20 8 19.5 8 17.5z"/>';
+  // Ladrido de chihuahua: tres "yip" agudos, una sierra que baja por un filtro, con un soplo de ruido
+  function woof() {
+    DOG.lick = 0.5;
+    if (!sfxOk()) return;
+    const { ctx } = MUSIC, t0 = ctx.currentTime + 0.01;
+    [0, 0.14, 0.3].forEach(d => {
+      const t = t0 + d, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(880, t); o.frequency.exponentialRampToValueAtTime(560, t + 0.08);
+      f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = 1.4;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.24, t + 0.008); g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      o.connect(f); f.connect(g); g.connect(MUSIC.fx); o.start(t); o.stop(t + 0.12);
+      burst(t, 0.07, 0.05, 'bandpass', 2600, 1);
+    });
+  }
+  function dogHome() {
+    const x = fr.x - Math.sin(fr.yaw) * 0.8 + 0.3, y = fr.y - Math.cos(fr.yaw) * 0.8;
+    const ok = canStand(x, y, DOG_R) && !DOORS.some(d => leafDist(d, d.th, x, y) < DOG_R + LEAF_T);
+    Object.assign(DOG, ok ? { x, y } : { x: fr.x + 0.01, y: fr.y + 0.35 });
+    DOG.h = floorAt(DOG.x, DOG.y); DOG.far = 0; DOG.chase = 0; DOG.sit = 0;
+  }
+  // ¿Puede Marshall pararse ahí? Como un niño, con su radio, y sin atravesar las hojas de las puertas
+  const dogOk = (x, y) => canStand(x, y, DOG_R) && !DOORS.some(d => leafDist(d, d.th, x, y) < DOG_R + LEAF_T);
+  function dogStep(dt, t) {
+    if (!dog.visible) return;
+    const toKid = Math.hypot(fr.x - DOG.x, fr.y - DOG.y), ballSp = Math.hypot(BALL.vx, BALL.vy), toBall = Math.hypot(BALL.x - DOG.x, BALL.y - DOG.y);
+    // A la pelota: si la patearon y no está lejos; se cansa a los 7 s
+    if (!DOG.chase && ballSp > 1.1 && toBall < 8) { DOG.chase = t + 7; woof(); }
+    if (DOG.chase && (t > DOG.chase || (ballSp < 0.25 && toBall < 0.6))) DOG.chase = 0;
+    let tx, ty, stopAt;
+    if (DOG.chase) { tx = BALL.x; ty = BALL.y; stopAt = 0; }
+    else { tx = fr.x - Math.sin(fr.yaw) * 0.75 + Math.cos(fr.yaw) * 0.3; ty = fr.y - Math.cos(fr.yaw) * 0.75 - Math.sin(fr.yaw) * 0.3; stopAt = 0.25; }
+    // Si el niño (o la pelota) quedó al otro lado de una pared con puerta, primero va al centro del vano y lo cruza
+    for (const d of DOORS) {
+      const du = Math.cos(d.rot0), dv = -Math.sin(d.rot0), side = (x, y) => (x - d.hx) * d.nx + (y - d.hy) * d.ny;
+      const pu = (DOG.x - d.hx) * du + (DOG.y - d.hy) * dv, pn = side(DOG.x, DOG.y), tn = side(tx, ty);
+      if (Math.abs(pn) < 0.9 && Math.sign(pn) !== Math.sign(tn) && pu > -0.6 && pu < d.L + 0.6) {
+        const c = d.L / 2, k = Math.abs(pn) > 0.12 ? pn : -Math.sign(pn || 1) * 0.35;   // al vano; ya en él, lo cruza
+        tx = d.hx + du * c + d.nx * (Math.abs(pn) > 0.12 ? Math.sign(pn) * 0.05 : k); ty = d.hy + dv * c + d.ny * (Math.abs(pn) > 0.12 ? Math.sign(pn) * 0.05 : k);
+        stopAt = 0; break;
+      }
+    }
+    const dx = tx - DOG.x, dy = ty - DOG.y, dist = Math.hypot(dx, dy);
+    let v = 0;
+    if (dist > stopAt && !(DOG.pet > t)) v = DOG.chase || dist > 2 ? 2.5 : Math.max(0.5, Math.min(1.2, dist * 1.6));
+    if (v > 0.05) DOG.yaw += Math.atan2(Math.sin(Math.atan2(dx, dy) - DOG.yaw), Math.cos(Math.atan2(dx, dy) - DOG.yaw)) * Math.min(1, dt * 7);
+    // Camina hacia donde mira (así da la vuelta como un perro) en pasitos, deslizándose por las paredes
+    const x0 = DOG.x, y0 = DOG.y, step = v * dt, n = Math.max(1, Math.ceil(step / 0.04));
+    for (let i = 0; i < n; i++) {
+      const sx = Math.sin(DOG.yaw) * step / n, sy = Math.cos(DOG.yaw) * step / n, h0 = floorAt(DOG.x, DOG.y);
+      for (const [cx0, cy0] of [[DOG.x + sx, DOG.y + sy], [DOG.x + sx, DOG.y], [DOG.x, DOG.y + sy]]) {
+        const [cx, cy] = pushOut(cx0, cy0, DOG_R), h1 = floorAt(cx, cy);
+        // Si la hoja de una puerta le estorba, la empuja como el niño (las que de ese lado casi no abren, no las puede jalar)
+        DOORS.forEach(d => {
+          if (leafDist(d, d.th, cx, cy) >= DOG_R + LEAF_T) return;
+          const a = d.rot0 + d.th, sg = Math.sign(Math.cos(a) * (cy - d.hy) + Math.sin(a) * (cx - d.hx)) || 1;
+          if (Math.abs(d.th) > 0.2 || Math.abs(sg > 0 ? d.hi : d.lo) >= 1) { d.w = sg * 2.4; d.hold = 0.8; }
+        });
+        if (!dogOk(cx, cy) || h1 - h0 > 0.26 || h0 - h1 > 0.3) continue;
+        DOG.x = cx; DOG.y = cy; break;
+      }
+    }
+    // Empuja la pelota con el hocico, hacia adelante y un poco de lado
+    if (DOG.chase && toBall < DOG_R + BALL_R + 0.12 && BALL.h - DOG.h < 0.3) {
+      const a = DOG.yaw + (Math.random() - 0.5) * 0.8, k = 1.6 + Math.random();
+      BALL.vx = Math.sin(a) * k; BALL.vy = Math.cos(a) * k; if (Math.random() < 0.3) woof();
+    }
+    // El niño la empuja si se le mete encima
+    if (toKid < FR_R + DOG_R) {
+      const ux = (DOG.x - fr.x) / (toKid || 1), uy = (DOG.y - fr.y) / (toKid || 1), nx = fr.x + ux * (FR_R + DOG_R), ny = fr.y + uy * (FR_R + DOG_R);
+      if (dogOk(nx, ny)) { DOG.x = nx; DOG.y = ny; }
+    }
+    // Si se quedó trabada más de 2 s (una puerta que no puede empujar, un rincón), llega corriendo por detrás del niño
+    const moved = Math.hypot(DOG.x - x0, DOG.y - y0);
+    DOG.far = toKid > 1.6 && v > 0.3 && moved < step * 0.3 ? DOG.far + dt : 0;
+    if (DOG.far > 2.2 || toKid > 14) dogHome();
+    // Ladra de vez en cuando si está cerca y tranquila
+    if (t > DOG.barkAt) { if (toKid < 4 && DOG.barkAt) woof(); DOG.barkAt = t + 20 + Math.random() * 25; }
+    // Animación: trote con las patas en diagonal, cola que se menea (más rápido si está contenta), sentada si está quieta
+    DOG.phase += moved * Math.PI * 2 / 0.28;
+    const speed = moved / Math.max(dt, 1e-3);
+    DOG.amp += (Math.min(1, speed / 1.5) - DOG.amp) * Math.min(1, dt * 8);
+    DOG.sit += ((speed < 0.05 && !DOG.chase ? 1 : 0) - DOG.sit) * Math.min(1, dt * (speed < 0.05 ? 2 : 8));
+    const sw = Math.sin(DOG.phase) * 0.6 * DOG.amp, S = DOG.sit;
+    DOG.legs[0].rotation.x = sw * (1 - S); DOG.legs[3].rotation.x = sw * (1 - S) - 1.4 * S;
+    DOG.legs[1].rotation.x = -sw * (1 - S); DOG.legs[2].rotation.x = -sw * (1 - S) - 1.4 * S;
+    dogBody.rotation.x = -0.45 * S; dogBody.position.y = -0.035 * S + Math.abs(Math.cos(DOG.phase)) * 0.012 * DOG.amp; dogBody.position.z = -0.03 * S;
+    const happy = DOG.pet > t || DOG.chase || toKid < 1.5;
+    DOG.tail.rotation.z = Math.sin(t * (happy ? 18 : 6)) * (happy ? 0.55 : 0.25);
+    // Sentada mira al niño; corriendo saca la lengua
+    const look = Math.atan2(fr.x - DOG.x, fr.y - DOG.y) - DOG.yaw;
+    DOG.head.rotation.y = Math.max(-0.9, Math.min(0.9, Math.atan2(Math.sin(look), Math.cos(look)))) * S;
+    DOG.head.rotation.x = 0.35 * S - 0.1 * DOG.amp; DOG.head.rotation.z = 0.28 * S * Math.sin(t * 0.5);   // sentado ladea la cabeza
+    DOG.lick = Math.max(0, DOG.lick - dt);
+    DOG.tongueM.visible = DOG.amp > 0.6 || happy || DOG.lick > 0;
+    DOG.h += (floorAt(DOG.x, DOG.y) - DOG.h) * Math.min(1, dt * 12);
+    dog.position.set(X(DOG.x), DOG.h, Z(DOG.y)); dog.rotation.y = DOG.yaw;
+  }
+  // Acariciarlo: se sienta, menea la cola a toda velocidad y ladra contento; el niño se agacha y le pasa la mano
+  function petDog() { DOG.pet = performance.now() / 1000 + 1.8; DOG.chase = 0; fr.petEnd = DOG.pet; express('feliz', 1.8); woof(); }
+  THINGS.push({ d: (x, y) => dog.visible ? Math.hypot(x - DOG.x, y - DOG.y) : 1e9, r: 1.2, label: () => 'Acariciar a Marshall', icon: () => 'paw', act: petDog });
+
   const hud = $('#play-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof'), swapBtn = $('#fh-swap');
   const playBtn = $('#v-play'), playMenu = $('#play-menu');
   function playFov() { camera.fov = camera.aspect < 1 ? 70 : 60; camera.updateProjectionMatrix(); }
@@ -3761,13 +3914,14 @@
       setRoof(true); roofBtn.setAttribute('aria-pressed', 'true');
       Object.assign(fr, { jz: 0, jv: 0, waveEnd: 0, speed: 0 });
       ballHome(4.3, 5.0); ball.visible = true;                    // la pelota espera en la sala
+      dog.visible = true; dogHome();                               // Marshall llega con el niño
       doorLimits();
       DOORS.forEach(d => { d.th = d.w = d.hold = d.pull = 0; d.leaf.rotation.y = d.rot0; });
       fr.fly = reduceMotion ? null : { p0: camera.position.clone(), t0: controls.target.clone(), start: performance.now() };
       playFov();
       canvas.focus({ preventScroll: true });
     } else {
-      resetThings(); kid.root.visible = false; playMusic(null);
+      resetThings(); dog.visible = false; kid.root.visible = false; playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
       camera.fov = 42; camera.updateProjectionMatrix();
