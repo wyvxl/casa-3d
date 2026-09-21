@@ -190,6 +190,10 @@
   .fh-btn .box{width:13px;height:13px;border:1.5px solid var(--ink);display:grid;place-items:center;flex:none}
   .fh-btn[aria-pressed="true"] .box{background:var(--ink)}
   .fh-btn[aria-pressed="true"] .box::after{content:"";width:3.5px;height:7px;border-right:2px solid var(--paper);border-bottom:2px solid var(--paper);transform:translateY(-1px) rotate(45deg)}
+  .fh-music{padding:0 12px}
+  .fh-music svg{width:22px;height:22px;display:block}
+  .fh-music[aria-pressed="true"]{color:var(--accent)}
+  .fh-music[aria-pressed="true"] .mute,.fh-music[aria-pressed="false"] .wave{display:none}
   .fh-btn.fh-exit{background:var(--ink);color:var(--paper);border-left-color:var(--ink)}
   .fh-btn.fh-exit:hover{background:var(--accent);border-left-color:var(--accent)}
   .stick{position:absolute;bottom:calc(28px + env(safe-area-inset-bottom,0px));width:136px;height:136px;border-radius:50%;background:var(--glass);border:1px solid var(--rule-strong);box-shadow:var(--shadow);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
@@ -365,12 +369,13 @@
 <div class="play-hud" id="play-hud" hidden>
   <div class="fh-bar panel">
     <button type="button" class="fh-who" id="fh-swap"><b id="fh-name">Franco</b><span id="fh-room">Corredor</span></button>
+    <button type="button" class="fh-btn fh-music" id="fh-music" aria-pressed="true" aria-label="Música"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5h4l5.5 4.5v-14L7 9.5z" fill="currentColor"/><path class="wave" d="M15.5 8.8a4.5 4.5 0 0 1 0 6.4M18.2 6.2a8.2 8.2 0 0 1 0 11.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <button type="button" class="fh-btn" id="fh-roof" aria-pressed="true"><span class="box"></span>Techo</button>
     <button type="button" class="fh-btn fh-exit" id="fh-exit">Salir del juego</button>
   </div>
   <div class="stick stick-move" id="stick-move" role="img" aria-label="Joystick para caminar"><span class="stick-lbl">Caminar</span><i class="knob"></i></div>
   <div class="stick stick-look" id="stick-look" role="img" aria-label="Joystick para mirar"><span class="stick-lbl">Mirar</span><i class="knob"></i></div>
-  <p class="fh-keys">W A S D o flechas para caminar · Shift para correr · arrastra para mirar · Esc para salir</p>
+  <p class="fh-keys">W A S D o flechas para caminar · Shift para correr · arrastra para mirar · M para la música · Esc para salir</p>
 </div>
 <div class="fallback" id="fallback" hidden><p>No se pudo iniciar el visor 3D. Abre la página en un navegador con WebGL activado (Chrome, Edge, Firefox o Safari recientes).</p></div>
 
@@ -2700,6 +2705,7 @@
   window.addEventListener('keydown', e => {
     if (!fr.on) return;
     if (e.code === 'Escape') { setView(fr.prev); return; }
+    if (e.code === 'KeyM' && !e.repeat) { toggleMusic(); return; }
     if (/^(Key[WASD]|Arrow|Shift)/.test(e.code)) { keys.add(e.code); if (e.code.startsWith('Arrow')) e.preventDefault(); }
   });
   window.addEventListener('keyup', e => keys.delete(e.code));
@@ -2808,6 +2814,163 @@
     camera.lookAt(fr.look);
   }
 
+  /* Música del juego (pedido de la dueña, 2026-09-21). La compone y la toca la página con Web Audio, sin archivos, así funciona
+     sin internet y abriendo con doble clic. Franco tiene una canción rápida y alegre, como de videojuego (152 pulsos por minuto
+     en do mayor: batería, bajo que salta, arpegios, melodía de onda cuadrada y un barrido antes de repetir) y Alayna una
+     tranquila de princesa (vals en fa mayor a 84: caja de música, arpa, un colchón suave, destellos y eco de sala). Arranca
+     sola al escoger el niño —ese toque es el permiso que piden los navegadores para sonar— y cambia al cambiar de niño. El
+     botón del parlante (o la tecla M) la apaga o la prende, y eso se recuerda en el navegador. Al salir del juego o al
+     esconder la pestaña se calla */
+  const MUSIC = { ctx: null, master: null, rev: null, noise: null, song: null, timer: 0, next: 0, step: 0, on: true };
+  try { MUSIC.on = localStorage.getItem('casa-musica') !== 'no'; } catch (err) { /* sin almacenamiento: arranca prendida */ }
+  const midiHz = m => 440 * Math.pow(2, (m - 69) / 12);
+  // Arma la mezcla sobre un contexto de audio: volumen general, compresor, eco de sala (una respuesta al impulso de ruido que se
+  // apaga en 2.4 s) y un segundo de ruido blanco para la batería
+  function audioGraph(ctx) {
+    const comp = ctx.createDynamicsCompressor(), master = ctx.createGain(), rev = ctx.createConvolver();
+    master.gain.value = 0; master.connect(comp); comp.connect(ctx.destination);
+    const len = Math.floor(ctx.sampleRate * 2.4), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+    rev.buffer = ir; rev.connect(master);
+    const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), nd = noise.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    return { ctx, master, rev, noise };
+  }
+  function audio() {
+    if (!MUSIC.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { Object.assign(MUSIC, audioGraph(new AC())); } catch (err) { return null; }
+    }
+    return MUSIC.ctx;
+  }
+  // Una nota: osciladores (la fundamental y sus armónicos, harm: [[múltiplo, nivel]]) por un filtro y una envolvente. o: type,
+  // vol, a (ataque), d (caída), s (nivel que se sostiene, 0 = pulsada), r (se apaga), cut (filtro), rev (cuánto va al eco)
+  function tone(t, m, dur, o) {
+    const { ctx } = MUSIC, env = ctx.createGain(), lp = ctx.createBiquadFilter(), a = o.a || 0.005, r = o.r || 0.08, end = t + Math.max(a, dur);
+    lp.type = 'lowpass'; lp.frequency.value = o.cut || 6000; lp.connect(env); env.connect(MUSIC.master);
+    if (o.rev) { const send = ctx.createGain(); send.gain.value = o.rev; env.connect(send); send.connect(MUSIC.rev); }
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(o.vol, t + a);
+    env.gain.setTargetAtTime(o.vol * (o.s == null ? 0.6 : o.s), t + a, (o.d || 0.1) / 3);
+    env.gain.setTargetAtTime(0, end, r / 3);
+    (o.harm || [[1, 1]]).forEach(([k, lvl]) => {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = o.type || 'sine'; osc.frequency.value = midiHz(m) * k; if (o.detune) osc.detune.value = o.detune;
+      g.gain.value = lvl; osc.connect(g); g.connect(lp); osc.start(t); osc.stop(end + r * 3 + 0.05);
+    });
+  }
+  function kick(t, vol) {
+    const { ctx } = MUSIC, o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.13);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+    o.connect(g); g.connect(MUSIC.master); o.start(t); o.stop(t + 0.3);
+  }
+  // Ruido filtrado: redoblante, platillo o el barrido que anuncia que la canción vuelve a empezar (sweep: hasta qué frecuencia sube)
+  function hiss(t, vol, dur, type, freq, sweep) {
+    const { ctx } = MUSIC, n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    n.buffer = MUSIC.noise; n.loop = dur > 0.9; f.type = type; f.frequency.setValueAtTime(freq, t);
+    if (sweep) { f.frequency.exponentialRampToValueAtTime(sweep, t + dur); g.gain.setValueAtTime(0.001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur); }
+    else { g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur); }
+    n.connect(f); f.connect(g); g.connect(MUSIC.master); n.start(t, Math.random() * 0.5); n.stop(t + dur + 0.02);
+  }
+  // Acordes (tríadas cerca del do central) y su bajo en la segunda octava
+  const CH = { C: [60, 64, 67], G: [55, 59, 62], Am: [57, 60, 64], F: [53, 57, 60], Bb: [58, 62, 65], Gm: [55, 58, 62] };
+  const ROOT = { C: 36, G: 43, Am: 45, F: 41, Bb: 46, Gm: 43 };
+  // Cada canción: step, lo que dura un paso (Franco en semicorcheas, Alayna en corcheas); per, pasos por compás; chords, un
+  // acorde por compás; mel, la melodía de cada compás como [paso, nota MIDI, pasos que dura]; play toca un paso
+  const SONGS = {
+    franco: {
+      step: 60 / 152 / 4, per: 16,
+      chords: ['C', 'G', 'Am', 'F', 'C', 'G', 'F', 'G'],
+      mel: [
+        [[0, 76, 2], [2, 79, 2], [4, 84, 2], [6, 83, 1], [7, 84, 1], [8, 79, 4], [12, 76, 2], [14, 77, 2]],
+        [[0, 79, 2], [2, 74, 2], [4, 71, 2], [6, 74, 2], [8, 79, 3], [11, 81, 1], [12, 79, 2], [14, 77, 2]],
+        [[0, 76, 2], [2, 72, 2], [4, 69, 2], [6, 72, 2], [8, 76, 2], [10, 77, 2], [12, 79, 4]],
+        [[0, 81, 2], [2, 79, 2], [4, 77, 2], [6, 76, 2], [8, 74, 2], [10, 72, 2], [12, 74, 2], [14, 79, 2]],
+        [[0, 76, 2], [2, 79, 2], [4, 84, 2], [6, 83, 1], [7, 84, 1], [8, 86, 4], [12, 84, 2], [14, 83, 2]],
+        [[0, 83, 2], [2, 79, 2], [4, 74, 2], [6, 79, 2], [8, 83, 3], [11, 84, 1], [12, 86, 4]],
+        [[0, 81, 2], [2, 84, 2], [4, 81, 2], [6, 77, 2], [8, 76, 2], [10, 77, 2], [12, 81, 4]],
+        [[0, 79, 2], [2, 83, 2], [4, 86, 2], [6, 83, 2], [8, 79, 1], [9, 81, 1], [10, 83, 1], [11, 84, 1], [12, 86, 2], [14, 91, 2]],
+      ],
+      play(bar, s, t, d) {
+        const name = this.chords[bar], ch = CH[name];
+        if (s % 4 === 0) kick(t, 0.8);                                        // bombo en cada tiempo
+        if (bar % 2 && s === 14) kick(t, 0.5);
+        if (s === 4 || s === 12) { hiss(t, 0.3, 0.14, 'bandpass', 1900); tone(t, 50, 0.05, { type: 'triangle', vol: 0.22, s: 0, d: 0.06 }); }
+        if (s % 2 === 0) hiss(t, s % 4 === 2 ? 0.08 : 0.045, s % 4 === 2 ? 0.09 : 0.035, 'highpass', 7500);
+        if (s % 2 === 0) tone(t, ROOT[name] + (s % 4 === 2 ? 12 : 0), d * 1.7, { type: 'square', vol: 0.12, s: 0.5, d: 0.12, r: 0.04, cut: 900 });
+        tone(t, ch[s % 3] + 12 * (1 + ((s >> 2) & 1)), d * 0.8, { type: 'square', vol: 0.026, s: 0.2, d: 0.05, r: 0.03, cut: 2800 });
+        this.mel[bar].forEach(([at, m, len]) => {
+          if (at === s) tone(t, m, len * d * 0.92, { type: 'square', vol: 0.08, s: 0.65, d: 0.12, r: 0.05, cut: 3200, rev: 0.12, harm: [[1, 1], [2.003, 0.18]] });
+        });
+        if (bar === 7 && s === 8) hiss(t, 0.1, d * 8, 'bandpass', 600, 7000);  // barrido antes de volver a empezar
+      },
+    },
+    alayna: {
+      step: 60 / 84 / 2, per: 6,
+      chords: ['F', 'Am', 'Bb', 'F', 'Gm', 'C', 'F', 'C', 'F', 'Am', 'Bb', 'F', 'Gm', 'C', 'C', 'F'],
+      mel: [
+        [[0, 81, 3], [3, 79, 1], [4, 77, 2]], [[0, 76, 2], [2, 77, 2], [4, 79, 2]], [[0, 81, 4], [4, 82, 2]], [[0, 84, 6]],
+        [[0, 82, 3], [3, 81, 1], [4, 79, 2]], [[0, 79, 2], [2, 77, 2], [4, 76, 2]], [[0, 77, 2], [2, 81, 2], [4, 84, 2]], [[0, 79, 6]],
+        [[0, 81, 3], [3, 79, 1], [4, 77, 2]], [[0, 76, 2], [2, 77, 2], [4, 79, 2]], [[0, 81, 4], [4, 82, 2]], [[0, 84, 4], [4, 86, 2]],
+        [[0, 84, 3], [3, 82, 1], [4, 81, 2]], [[0, 79, 2], [2, 76, 2], [4, 72, 2]], [[0, 76, 2], [2, 79, 2], [4, 82, 2]], [[0, 77, 6]],
+      ],
+      play(bar, s, t, d) {
+        const name = this.chords[bar], ch = CH[name];
+        if (s === 0) {
+          // Bajo pulsado y colchón suave que entra despacio y dura todo el compás
+          tone(t, ROOT[name] + (ROOT[name] < 40 ? 12 : 0), d * 6, { type: 'triangle', vol: 0.2, s: 0, d: 1.6, r: 0.6, cut: 1400, rev: 0.35 });
+          ch.forEach((m, i) => tone(t, m + 12, d * 6, { type: 'sine', vol: 0.028, a: 0.5, s: 1, r: 0.9, rev: 0.6, detune: (i - 1) * 5, harm: [[1, 1], [2, 0.25]] }));
+        } else {
+          // Arpa: el acorde subiendo en corcheas
+          tone(t, ch[(s - 1) % 3] + (s > 3 ? 12 : 0), d * 2, { type: 'triangle', vol: 0.07, s: 0, d: 0.8, r: 0.4, cut: 2600, rev: 0.5, harm: [[1, 1], [2, 0.3]] });
+        }
+        this.mel[bar].forEach(([at, m, len]) => {                             // caja de música
+          if (at === s) tone(t, m, len * d, { type: 'sine', vol: 0.13, a: 0.004, s: 0, d: 1.3, r: 0.5, rev: 0.55, harm: [[1, 1], [2, 0.35], [3, 0.1], [4.2, 0.05]] });
+        });
+        if ((bar === 3 || bar === 11) && s === 5) tone(t, 96, d * 3, { type: 'sine', vol: 0.035, s: 0, d: 0.9, rev: 0.8, harm: [[1, 1], [2.76, 0.2]] });   // destello
+      },
+    },
+  };
+  // Programa las notas que caen en los próximos 120 ms; corre cada 40 ms
+  function musicTick() {
+    const { ctx, song } = MUSIC; if (!song || !ctx) return;
+    while (MUSIC.next < ctx.currentTime + 0.12) {
+      const s = MUSIC.step % (song.per * song.chords.length);
+      song.play(Math.floor(s / song.per), s % song.per, MUSIC.next, song.step);
+      MUSIC.next += song.step; MUSIC.step++;
+    }
+  }
+  // La canción de un niño, o ninguna con null. Entre una y otra baja el volumen para que no se encimen; callada, el audio se
+  // suspende para no gastar
+  function playMusic(who) {
+    const song = who && MUSIC.on ? SONGS[who] : null;
+    if (!song && !MUSIC.ctx) return;
+    const ctx = audio(); if (!ctx) return;
+    const g = MUSIC.master.gain, now = ctx.currentTime;
+    g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + 0.15);
+    clearInterval(MUSIC.timer); MUSIC.song = song;
+    if (!song) { MUSIC.timer = setTimeout(() => { if (!MUSIC.song) ctx.suspend(); }, 400); return; }
+    if (ctx.state !== 'running') ctx.resume();
+    MUSIC.step = 0; MUSIC.next = now + 0.2;
+    g.linearRampToValueAtTime(0.8, now + 0.6);
+    MUSIC.timer = setInterval(musicTick, 40); musicTick();
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!MUSIC.ctx || !MUSIC.song) return;
+    if (document.hidden) MUSIC.ctx.suspend(); else MUSIC.ctx.resume();
+  });
+  const musicBtn = $('#fh-music');
+  function syncMusicBtn() { musicBtn.setAttribute('aria-pressed', String(MUSIC.on)); musicBtn.title = MUSIC.on ? 'Apagar la música (M)' : 'Poner música (M)'; }
+  function toggleMusic() {
+    MUSIC.on = !MUSIC.on; syncMusicBtn();
+    try { localStorage.setItem('casa-musica', MUSIC.on ? 'si' : 'no'); } catch (err) { /* no se recuerda, pero igual cambia */ }
+    playMusic(fr.on ? fr.who : null);
+  }
+  musicBtn.addEventListener('click', toggleMusic);
+  syncMusicBtn();
+
   const hud = $('#play-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof'), swapBtn = $('#fh-swap');
   const playBtn = $('#v-play'), playMenu = $('#play-menu');
   function playFov() { camera.fov = camera.aspect < 1 ? 70 : 60; camera.updateProjectionMatrix(); }
@@ -2818,6 +2981,7 @@
     const other = KIDS[who === 'franco' ? 'alayna' : 'franco'].name;
     $('#fh-name').textContent = kid.name;
     swapBtn.title = `Cambiar a ${other}`; swapBtn.setAttribute('aria-label', `Jugando con ${kid.name}. Cambiar a ${other}`);
+    if (fr.on) playMusic(who);                                // cada niño con su canción
   }
   function setGame(on, who) {
     if (on === fr.on) { if (on && who) setKid(who); return; }
@@ -2837,7 +3001,7 @@
       playFov();
       canvas.focus({ preventScroll: true });
     } else {
-      kid.root.visible = false;
+      kid.root.visible = false; playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
       camera.fov = 42; camera.updateProjectionMatrix();
