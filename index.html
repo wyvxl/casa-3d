@@ -1284,6 +1284,7 @@
      boquete arranca al nivel del patio, en la cara del muro de atrás, y baja por la orilla hasta el piso del garaje, así que la losa
      (capa Losa) deja esa franja libre. Al lado, contra la tapia, la zona de plantas: jardineras que suben con la grada */
   const extraNow = new THREE.Group(), extraBoq = new THREE.Group(); extra.add(extraNow, extraBoq);
+  const GRADA = { now: null, boq: null };                     // medidas de cada versión de la grada, para que el juego baje por ella
   const stairE = LEFT.edge + LEFT.bed + LEFT.stair / 2;                     // eje de la grada, del lindero hacia adentro
   // Grada recta a lo largo del lindero: el escalón de arriba llega a tTop, al nivel yTop, y baja hacia la calle hasta yBot. Con tBot
   // la huella se reparte entre los dos extremos; sin él mide tread. Devuelve los datos para acomodar las jardineras al lado
@@ -1325,14 +1326,14 @@
     // Hoy: la grada baja por el talud, del borde de la terraza a la calle (el primer escalón queda en la calle, como el terreno)
     const s0 = sIn(...EP(stairE, 0)), kS = sIn(...EP(stairE, 1)) - s0, tOf = s => (s - s0) / kS;
     const tTop = tOf(GROUND.talud + 0.05), tBot = tOf(-0.55);
-    const st = leftStair(tTop, 0, streetY(tAl(...EP(stairE, tBot))), extraNow, tBot);
+    const st = leftStair(tTop, 0, streetY(tAl(...EP(stairE, tBot))), extraNow, tBot); GRADA.now = st;
     gardenZone(st, tOf(-0.3), tTop + 3.0, extraNow, 5);
   }
   {
     // Con el boquete: del piso del garaje a la cara del muro de atrás, ya al nivel del patio
     const v0 = vOf(...EP(stairE, 0)), kV = vOf(...EP(stairE, 1)) - v0, tOf = v => (v - v0) / kV;
     const tTop = tOf(BOQ.depth);
-    const st = leftStair(tTop, 0, floorY(...EP(stairE, tTop - 3.6)), extraBoq);
+    const st = leftStair(tTop, 0, floorY(...EP(stairE, tTop - 3.6)), extraBoq); GRADA.boq = st;
     gardenZone(st, 0.15, undefined, extraBoq, 9);
   }
 
@@ -1561,7 +1562,7 @@
   let losaY = 0, losaMid = [0, 0], stepRoom = 0, losaStepBox = [0, 0, 0, 0];   // losaStepBox: [x0, x1, z0, z1] de las gradas, para Franco
   // Para el juego: las gradas del costado (n escalones de huella tr que llegan a yW), las del frente de la casa (LF, en el
   // plano) y los postes del techo de la losa. fitLosaFront acomoda las gradas del frente cuando se mueve la casa
-  let LS = { n: 0, tr: 0.3, yW: 0 }, LF = { x0: 0, x1: 0, y0: 0, depth: 0, n: 3 }, losaPosts = [], losaFront = null, fitLosaFront = () => {};
+  let LS = { n: 0, tr: 0.3, yW: 0 }, LF = { x0: 0, x1: 0, y0: 0, depth: 0, n: 3 }, losaPosts = [], losaCols = [], losaFront = null, fitLosaFront = () => {};
   {
     const conc = std({ color: 0xBEB9B1, map: T_concrete, roughness: .95 });
     const wood = std({ color: 0x9A6B3C, roughness: .7 });
@@ -1624,7 +1625,7 @@
       [e, 0.5, 1 - e].forEach(f => {
         const x = A[0] + (B[0] - A[0]) * f + inw[0], z = A[1] + (B[1] - A[1]) * f + inw[1];
         const top = soffit - LOSA.beam, bot = floorY(x, z) - 0.25;
-        addBox(LOSA.col, top - bot, LOSA.col, conc, x, (top + bot) / 2, z, losaG).rotation.y = yaw;
+        addBox(LOSA.col, top - bot, LOSA.col, conc, x, (top + bot) / 2, z, losaG).rotation.y = yaw; losaCols.push([x, z]);
       });
 
       /* Portones (capa Techo losa, pedido de la dueña, 2026-09-21), para que el boquete quede cerrado: uno seccional de lámina
@@ -2890,6 +2891,20 @@
   const clampPitch = p => Math.max(-0.12, Math.min(1.25, p));
   const inHouse = (x, y) => x >= -0.08 && x <= W + 0.08 && y >= -0.08 && y <= D + 0.08;
   const onPatio = (x, y) => x >= 2.88 && x <= W + 0.08 && y >= -1.05 && y < -0.08;
+  /* Abajo de la terraza (pedido de la dueña, 2026-09-21: bajar a la calle por la grada). Con la capa Grada y plantas se baja por
+     la grada de la orilla izquierda: hoy, por el talud hasta la calle, y se camina por la calle frente al lote; con el boquete,
+     hasta el piso del garaje, que con la capa Techo losa queda cerrado por los portones. p es el punto en el mundo */
+  function gradaFloor(p) {
+    if (!state.extra) return null;
+    const st = state.boq ? GRADA.boq : GRADA.now; if (!st) return null;
+    const e = -eOf(p.x, p.z), t = (p.x - LOT[1][0]) * eu[0] + (p.z - LOT[1][1]) * eu[1], e0 = LEFT.edge + LEFT.bed;
+    if (e < e0 || e > e0 + LEFT.stair || t > st.tTop + 0.45 || t < st.tBot) return null;   // arriba empalma con la terraza
+    if (t > st.tTop) return st.yTop;
+    const i = Math.min(st.n - 1, Math.floor((st.tTop - t) / st.tread));
+    return st.yTop - (st.yTop - st.yBot) * i / st.n;
+  }
+  const inStreet = p => { const si = sIn(p.x, p.z); return si < 0 && si > -ROAD_W + 0.3; };
+  const inGarage = p => state.boq && vOf(p.x, p.z) < BOQ.depth && sIn(p.x, p.z) > (state.techo ? 0.35 : -0.5);
   const fw = new V3(), camWant = new V3(), lookWant = new V3();
   /* La losa (capa Losa): a qué altura queda el piso sobre ella o sobre sus gradas, o null si ahí no hay losa. x, y en el plano y
      p el mismo punto en el mundo. Las gradas del frente de la casa (LF) van en el plano; las del costado, en el mundo, corridas
@@ -2899,7 +2914,7 @@
     if (losaFront.visible && x >= LF.x0 && x <= LF.x1 && y >= LF.y0 && y <= LF.y0 + LF.depth)
       return losaY * Math.min(LF.n, Math.floor((y - LF.y0) / LF.depth * LF.n) + 1) / (LF.n + 1);
     const o = losaSteps.position, [x0, x1, z0, z1] = losaStepBox;
-    if (p.x > x0 + o.x && p.x < x1 + o.x && p.z > z0 + o.z - LS.tr / 2 && p.z < z1 + o.z + LS.tr / 2) {
+    if (p.x > x0 + o.x && p.x < x1 + o.x && p.z > z0 + o.z - LS.tr / 2 && p.z <= z1 + o.z) {
       const i = LS.n - Math.ceil((LS.yW - (p.z - o.z + D / 2)) / LS.tr);
       return i >= 1 ? losaY * i / LS.n : null;
     }
@@ -2915,7 +2930,10 @@
     const p = toHouse(fw.set(X(x), 0, Z(y)));
     if (wOf(p.x, p.z) > -r || sBack(p.x, p.z) > -0.2 - r) return false;
     if (eOf(p.x, p.z) > -(state.extra && !state.boq ? LEFT.edge + LEFT.bed + r : r)) return false;
-    if (state.boq ? vOf(p.x, p.z) < BOQ.depth + BOQ.wall + r && losaFloor(x, y, p) === null : sIn(p.x, p.z) < GROUND.talud + r) return false;
+    // Fuera de la terraza solo sobre la losa, la grada, el garaje o la calle (que no se tire de un borde lo cuida walkBy)
+    const low = gradaFloor(p) !== null || (inStreet(p) && !(state.boq && state.techo)) || inGarage(p);
+    if (state.boq ? vOf(p.x, p.z) < BOQ.depth + BOQ.wall + r && losaFloor(x, y, p) === null && !low : sIn(p.x, p.z) < GROUND.talud + r && !low) return false;
+    if (state.losa && losaCols.some(([ox, oz]) => Math.hypot(p.x - ox, p.z - oz) < 0.18 + r)) return false;
     if (state.techo && losaPosts.some(([ox, oz]) => Math.hypot(p.x - ox, p.z - oz) < 0.08 + r)) return false;
     return WOBST.every(([ox, oz, or]) => Math.hypot(p.x - ox, p.z - oz) > or + r);
   }
@@ -2956,13 +2974,21 @@
     if (onPatio(x, y)) return FL - 0.06;
     const p = toHouse(fw.set(X(x), 0, Z(y))), lf = losaFloor(x, y, p);
     if (lf !== null) return lf;
+    const gf = gradaFloor(p);
+    if (gf !== null) return gf;
     return (state.boq ? boqY : groundY)(p.x, p.z);            // el grupo de la casa va en y = 0, así que sirve tal cual
   }
   function roomAt(x, y) {
     const r = ROOMS.find(q => x >= q.rect[0] && x <= q.rect[1] && y >= q.rect[2] && y <= q.rect[3]);
     if (r) return r.name;
     if (onPatio(x, y)) return 'Patio de pilas';
-    return losaFloor(x, y, toHouse(fw.set(X(x), 0, Z(y)))) === losaY ? 'Sobre la losa' : 'Afuera, en el lote';
+    const p = toHouse(fw.set(X(x), 0, Z(y)));
+    if (losaFloor(x, y, p) === losaY) return 'Sobre la losa';
+    if (gradaFloor(p) !== null) return 'En la grada';
+    if (inGarage(p) && floorAt(x, y) < -0.5) return 'En el garaje';
+    if (inStreet(p)) return 'En la calle';
+    if (x > -1 && x < 6.5 && y < -2.5 && y > -7.5) return 'En el patio de juegos';
+    return 'Afuera, en el lote';
   }
 
   /* Puertas con física (pedido de la dueña, 2026-09-21). En el modo Franco las cinco arrancan cerradas y él las mueve al
@@ -3075,9 +3101,10 @@
   }
 
   // La cámara no pasa paredes, columnas, marcos ni hojas de puerta: devuelve qué fracción del tramo de a a b está libre
+  const camExtra = [];
   function camHit(ax, ay, bx, by) {
     const m = 0.12, dx = bx - ax, dy = by - ay; let best = 1;
-    for (const o of OBST) {
+    for (const o of camExtra.length ? OBST.concat(camExtra) : OBST) {
       if (o[4] !== 'wall') continue;
       const x0 = o[0] - m, x1 = o[1] + m, y0 = o[2] - m, y1 = o[3] + m;
       if (ax > x0 && ax < x1 && ay > y0 && ay < y1) continue;
@@ -3193,7 +3220,7 @@
       fr.yawT = Math.atan2(fr.wantX, fr.wantY);
     }
     doorsStep(dt);
-    ballStep(dt); thingsStep(dt, t); dogStep(dt, t);
+    ballStep(dt); thingsStep(dt, t); dogStep(dt, t); playStepIdle(dt, t);
 
     // Cuerpo: gira hacia donde camina y, según lo que avanzó, mece las piernas (la rodilla se dobla cuando la pierna va hacia
     // adelante y el pie se mantiene casi plano) y los brazos (el codo se dobla más en el brazo que va adelante). Quieto,
@@ -3251,12 +3278,15 @@
     // Mientras más se acerca, más sube, para ver por encima de su cabeza en los cuartos chicos. Bajo el cielo raso no pasa
     // de 2.48 m, y muy cerca lo esconde para no ver por dentro de su cabeza
     const cp = Math.cos(fr.pitch), sp = Math.sin(fr.pitch), ox = Math.sin(fr.camYaw) * cp, oy = Math.cos(fr.camYaw) * cp;
+    camExtra.length = 0;                                      // abajo, en el garaje o la calle, el muro de atrás del boquete ataja la cámara
+    if (state.boq && fr.h < -0.5 && Math.abs(MOVE.turn) < 0.005) camExtra.push([-4, W + 0.6, LF.y0 + LF.depth, LF.y0 + LF.depth + BOQ.wall, 'wall']);
     const want = Math.max(0.3, fr.dist * camHit(fr.x, fr.y, fr.x + ox * fr.dist, fr.y + oy * fr.dist));
     fr.camD = want < fr.camD ? want : fr.camD + (want - fr.camD) * Math.min(1, dt * 3);
     const cx = fr.x + ox * fr.camD, cy = fr.y + oy * fr.camD;
     let ch = fr.h + 1.0 + sp * fr.camD + Math.max(0, fr.dist - fr.camD) * 0.45;
     if (state.roof && Math.abs(X(cx)) < hw + 0.05 && Math.abs(Z(cy)) < hd + 0.05) ch = Math.min(ch, FL + CEIL - 0.12);
     if (state.techo && losaFloor(cx, cy, toHouse(fw.set(X(cx), 0, Z(cy)))) === losaY) ch = Math.min(ch, losaY + TECHO.low - 0.12);   // bajo el techo de la losa
+    if (state.losa && fr.h < -0.5) { const q = toHouse(fw.set(X(cx), 0, Z(cy))); if (vOf(q.x, q.z) < BOQ.depth + BOQ.wall + 0.3) ch = Math.min(ch, losaY - LOSA.thick - 0.12); }   // en el garaje
     ch = Math.max(ch, fr.h + 0.45);
     toHouse(camWant.set(X(cx), ch, Z(cy)));
     camWant.y = Math.max(camWant.y, (state.boq ? boqY : groundY)(camWant.x, camWant.z) + 0.3);
@@ -3449,7 +3479,8 @@
   // Qué piso pisa: adentro cerámica, el corredor y el patio de pilas concreto, la franja del frente piedrilla, y afuera tierra
   function surfaceAt(x, y) {
     if (inHouse(x, y)) return x > 3.0 && y > 6.0 ? 'concrete' : 'tile';
-    if (onPatio(x, y) || losaFloor(x, y, toHouse(fw.set(X(x), 0, Z(y)))) !== null) return 'concrete';
+    const p = toHouse(fw.set(X(x), 0, Z(y)));
+    if (onPatio(x, y) || losaFloor(x, y, p) !== null || gradaFloor(p) !== null || inStreet(p) || (inGarage(p) && floorAt(x, y) < -0.5)) return 'concrete';
     return y > D + 0.08 && y < D + 0.08 + BOQ.gap && x > -0.5 ? 'gravel' : 'earth';
   }
   function footstep(v) {
@@ -3613,10 +3644,12 @@
     if (!fr.pose) return;
     [fr.x, fr.y] = fr.pose.from; fr.pose = null;
     kid.root.quaternion.identity(); kid.body.rotation.set(0, 0, 0);
+    kid.arms.forEach((a, i) => { a.rotation.z = (i ? 1 : -1) * 0.1; });
   }
   function applyPose(t) {
     const P = fr.pose, s = kid.root.scale.x;
     kid.head.rotation.set(0, 0, 0);
+    if (P.kind === 'swing' || P.kind === 'slide') { playPose(P, t); return; }
     if (P.kind === 'sit') {
       kid.root.position.set(X(P.hx), FL + P.seat + 0.02 - 0.52 * s, Z(P.hy)); kid.root.rotation.set(0, P.face, 0);
       kid.body.rotation.set(-0.12, 0, 0); kid.body.position.y = Math.sin(t * 2.4) * 0.003;
@@ -3888,6 +3921,133 @@
   function petDog() { DOG.pet = performance.now() / 1000 + 1.8; DOG.chase = 0; fr.petEnd = DOG.pet; express('feliz', 1.8); woof(); }
   THINGS.push({ d: (x, y) => dog.visible ? Math.hypot(x - DOG.x, y - DOG.y) : 1e9, r: 1.2, label: () => 'Acariciar a Marshall', icon: () => 'paw', act: petDog });
 
+  /* ---------- juego: el patio de juegos ---------- */
+  /* Pedido de la dueña, 2026-09-21: en el patio de atrás, una hamaca de dos asientos y un tobogán, que solo aparecen en el
+     juego. En la hamaca el niño se sienta, agarra las cadenas y se columpia solo, cada vez más alto; en el tobogán sube la
+     escalera, se sienta arriba y se tira. Van en coordenadas del plano, colgados de house, y los niños y la pelota chocan
+     con sus patas */
+  const playG = new THREE.Group(); playG.visible = false; house.add(playG);
+  {
+    const blueM = kidMat(0x2E6DB4, { roughness: .45, metalness: .35 }), yellowM = kidMat(0xF2C230, { roughness: .45 }), redM = kidMat(0xE0483E, { roughness: .45 });
+    const chainM = kidMat(0x9AA0A6, { roughness: .4, metalness: .7 }), P = (x, h, y) => new V3(X(x), h, Z(y));
+    // Hamaca: dos marcos en A, la viga a 2.00 m y dos asientos amarillos colgando de cadenas de 1.55 m
+    const SW = { beam: 2.0, L: 1.55, y: -5.0, x0: 1.7, x1: 3.9 };
+    [SW.x0, SW.x1].forEach(x => [-1, 1].forEach(s => {
+      pipe(P(x, 0, SW.y + s * 0.75), P(x, SW.beam, SW.y), 0.04, blueM, playG);
+      OBST.push([x - 0.07, x + 0.07, SW.y + s * 0.75 - 0.07, SW.y + s * 0.75 + 0.07, 'fix']);
+    }));
+    pipe(P(SW.x0 - 0.1, SW.beam, SW.y), P(SW.x1 + 0.1, SW.beam, SW.y), 0.045, blueM, playG);
+    SW.seats = [2.35, 3.25].map(x => {
+      const g = new THREE.Group(); g.position.copy(P(x, SW.beam, SW.y)); playG.add(g);
+      [-1, 1].forEach(s => pipe(new V3(s * 0.2, 0, 0), new V3(s * 0.2, -SW.L, 0), 0.008, chainM, g));
+      addBox(0.44, 0.035, 0.17, yellowM, 0, -SW.L, 0, g);
+      OBST.push([x - 0.24, x + 0.24, SW.y - 0.1, SW.y + 0.1, 'fix']);
+      return { x, g, amp: 0, t0: 0, cos: 1 };
+    });
+    // Tobogán: escalera inclinada atrás, plataforma a 1.20 m con barandas y la canaleta roja que baja hacia la casa
+    const SL = { x: 0.6, top: 1.2, yLad: -6.2, yPlat: -5.4, yStart: -5.1, yEnd: -3.0 };
+    [-1, 1].forEach(s => {
+      pipe(P(SL.x + s * 0.22, 0, SL.yLad), P(SL.x + s * 0.22, SL.top + 0.6, SL.yPlat - 0.25), 0.03, blueM, playG);   // largueros
+      pipe(P(SL.x + s * 0.24, 0, SL.yStart), P(SL.x + s * 0.24, SL.top + 0.6, SL.yStart), 0.035, blueM, playG);       // postes de adelante
+      pipe(P(SL.x + s * 0.24, SL.top + 0.55, SL.yPlat - 0.2), P(SL.x + s * 0.24, SL.top + 0.55, SL.yStart), 0.025, blueM, playG);   // baranda
+    });
+    for (let i = 1; i <= 5; i++) { const k = i / 6; pipe(P(SL.x - 0.22, SL.top * k, SL.yLad + (SL.yPlat - 0.25 - SL.yLad) * k), P(SL.x + 0.22, SL.top * k, SL.yLad + (SL.yPlat - 0.25 - SL.yLad) * k), 0.02, yellowM, playG); }
+    addBox(0.52, 0.05, SL.yStart - SL.yPlat + 0.25, yellowM, X(SL.x), SL.top - 0.025, Z((SL.yPlat - 0.25 + SL.yStart) / 2), playG);
+    // Canaleta: tramo inclinado y un tramito plano al final, con sus bordes
+    const chute = (y0, h0, y1, h1) => {
+      const len = Math.hypot(y1 - y0, h1 - h0), a = Math.atan2(h0 - h1, y1 - y0), c = P(SL.x, (h0 + h1) / 2, (y0 + y1) / 2);
+      const bed = addBox(0.46, 0.03, len, redM, c.x, c.y, c.z, playG); bed.rotation.x = a;
+      [-1, 1].forEach(s => { const w = addBox(0.03, 0.14, len, redM, c.x + s * 0.23, c.y + 0.06, c.z, playG); w.rotation.x = a; });
+    };
+    chute(SL.yStart, SL.top, -3.55, 0.33); chute(-3.55, 0.33, SL.yEnd, 0.28);
+    const legY = -3.4;                                          // patas bajo la canaleta
+    [-1, 1].forEach(s => pipe(P(SL.x + s * 0.2, 0, legY), P(SL.x + s * 0.2, 0.36, legY), 0.025, blueM, playG));
+    OBST.push([SL.x - 0.3, SL.x + 0.3, SL.yLad, SL.yEnd, 'fix']);
+    Object.assign(playG.userData, { SW, SL });
+  }
+  const SWG = playG.userData.SW, SLD = playG.userData.SL;
+  // Soplido del tobogán: ruido que sube de tono mientras baja
+  function whoosh() {
+    if (!sfxOk()) return;
+    const { ctx } = MUSIC, t = ctx.currentTime + 0.01, n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    n.buffer = MUSIC.noise; n.loop = true; fl.type = 'bandpass'; fl.Q.value = 1.2; fl.frequency.setValueAtTime(400, t); fl.frequency.exponentialRampToValueAtTime(1800, t + 1.1);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.18, t + 0.3); g.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+    n.connect(fl); fl.connect(g); g.connect(MUSIC.fx); n.start(t); n.stop(t + 1.35);
+  }
+  // Camino del tobogán, de 0 (arriba) a 1 (abajo): [y del plano, altura de la canaleta, inclinación]
+  const slideAt = k => {
+    const a = [SLD.yStart, SLD.top], b = [-3.55, 0.33], c = [SLD.yEnd, 0.28], cut = 0.8;
+    if (k < cut) { const u = k / cut; return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, Math.atan2(a[1] - b[1], b[0] - a[0])]; }
+    const u = (k - cut) / (1 - cut); return [b[0] + (c[0] - b[0]) * u, b[1] + (c[1] - b[1]) * u, 0];
+  };
+  const slideOff = new V3();
+  // Poses del patio: columpiarse (la hamaca va y viene sola, cada vez más alto) y el tobogán (sube, se sienta y se tira)
+  function playPose(P, t) {
+    const s = kid.root.scale.x;
+    if (P.kind === 'swing') {
+      const seat = P.seat, w = Math.sqrt(9.8 / SWG.L), th = seat.amp * Math.sin(w * (t - seat.t0));
+      seat.g.rotation.x = th;
+      const c = Math.cos(w * (t - seat.t0));
+      if (Math.sign(c) !== Math.sign(seat.cos) && seat.amp > 0.2 && sfxOk()) creak(MUSIC.ctx.currentTime + 0.01, 0.3, 0.035);   // rechina en cada punta
+      seat.cos = c;
+      // El asiento, girado con la cadena; la cadera un poco atrás del centro para que las piernas queden al frente
+      slideOff.set(0, 0.02 - 0.52 * s, -0.06).applyAxisAngle(new V3(1, 0, 0), th);
+      kid.root.position.set(X(seat.x), SWG.beam - SWG.L * Math.cos(th), Z(SWG.y) - SWG.L * Math.sin(th)).add(slideOff);
+      kid.root.rotation.set(th, 0, 0);
+      const pump = Math.sin(w * (t - seat.t0));
+      [0, 1].forEach(i => {
+        kid.legs[i].rotation.x = -1.45 - 0.2 * pump; kid.knees[i].rotation.x = 1.0 + 0.55 * pump; kid.feet[i].rotation.x = 0.1;
+        kid.arms[i].rotation.x = -2.35; kid.arms[i].rotation.z = (i ? 1 : -1) * 0.18; kid.elbows[i].rotation.x = -0.35;
+      });
+      kid.body.rotation.set(-0.1 * pump, 0, 0);
+      seat.amp = Math.min(0.75, seat.amp + 0.12 / 60);
+      P.look = 0.9;
+      return;
+    }
+    // Tobogán: 0 a 1 s sube la escalera, 1 a 1.35 s se sienta arriba, 1.35 a 2.45 s se tira (cada vez más rápido), y abajo se para
+    const T = t - P.t0, x = X(SLD.x);
+    kid.root.rotation.set(0, 0, 0);
+    if (T < 1) {
+      const k = T, y = SLD.yLad - 0.18 + (SLD.yPlat - 0.1 - SLD.yLad + 0.18) * k;
+      kid.root.position.set(x, SLD.top * k, Z(y));
+      [0, 1].forEach(i => {
+        const sw = Math.sin(T * 12 + i * Math.PI);
+        kid.legs[i].rotation.x = -0.5 - 0.4 * sw; kid.knees[i].rotation.x = 0.7 + 0.4 * sw;
+        kid.arms[i].rotation.x = -2.1 + 0.4 * sw; kid.arms[i].rotation.z = (i ? 1 : -1) * 0.1; kid.elbows[i].rotation.x = -0.5;
+      });
+      fr.x = SLD.x; fr.y = y; P.look = SLD.top * k + 0.9;
+    } else {
+      let k = 0;
+      if (T >= 1.35) k = Math.min(1, ((T - 1.35) / 1.1) ** 2);
+      if (T >= 1.35 && !P.woosh) { P.woosh = 1; whoosh(); express('feliz', 2); }
+      const [y, h, a] = T < 1.35 ? [SLD.yPlat + (SLD.yStart - SLD.yPlat) * (T - 1) / 0.35, SLD.top, 0] : slideAt(k);
+      slideOff.set(0, 0.04 - 0.52 * s, -0.08).applyAxisAngle(new V3(1, 0, 0), a);
+      kid.root.position.set(x, h, Z(y)).add(slideOff); kid.root.rotation.set(a, 0, 0);
+      [0, 1].forEach(i => {
+        kid.legs[i].rotation.x = -1.5; kid.knees[i].rotation.x = 0.25; kid.feet[i].rotation.x = 0;
+        kid.arms[i].rotation.x = T >= 1.35 ? -2.8 : -0.5; kid.arms[i].rotation.z = (i ? 1 : -1) * (T >= 1.35 ? 0.35 : 0.1); kid.elbows[i].rotation.x = -0.2;   // ¡brazos arriba!
+      });
+      fr.x = SLD.x; fr.y = y; P.look = h + 0.8;
+      if (T > 2.75) { P.from = [SLD.x, SLD.yEnd + 0.35]; endPose(); }
+    }
+    kid.body.rotation.set(0, 0, 0);
+  }
+  THINGS.push(
+    ...SWG.seats.map(seat => ({ d: nearPoint(seat.x, SWG.y + 0.5), r: 0.5, label: () => 'Columpiarse', icon: () => 'swing',
+      act: () => { seat.t0 = performance.now() / 1000; seat.amp = Math.max(seat.amp, 0.15); startPose({ kind: 'swing', seat, cx: seat.x, cy: SWG.y + 0.25, look: 0.9 }); } })),
+    { d: nearPoint(SLD.x, SLD.yLad - 0.3), r: 0.55, label: () => 'Tirarse por el tobogán', icon: () => 'slide',
+      act: () => startPose({ kind: 'slide', t0: performance.now() / 1000, cx: SLD.x, cy: SLD.yLad - 0.18, look: 0.9 }) });
+  ICONS.swing = '<path d="M3 4h18M7 4v11M17 4v11"/><path d="M5 15h4M15 15h4"/><path d="M12 4v7"/><circle cx="12" cy="13.5" r="2"/><path d="M9 19l3-3 3 3"/>';
+  ICONS.slide = '<path d="M5 21V7h4v3M5 11h4M5 15h4"/><path d="M9 7c3 0 3 3 5 6s3 5 7 6"/><path d="M9 10c2.5 0 2.7 2.5 4.4 5.2S16 19.5 20 20.5"/>';
+  // Las hamacas que quedan solas se van frenando
+  function playStepIdle(dt, t) {
+    SWG.seats.forEach(seat => {
+      if (fr.pose && fr.pose.seat === seat) return;
+      seat.amp *= Math.exp(-0.5 * dt);
+      seat.g.rotation.x = seat.amp * Math.sin(Math.sqrt(9.8 / SWG.L) * (t - seat.t0));
+    });
+  }
+
   const hud = $('#play-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof'), swapBtn = $('#fh-swap');
   const playBtn = $('#v-play'), playMenu = $('#play-menu');
   function playFov() { camera.fov = camera.aspect < 1 ? 70 : 60; camera.updateProjectionMatrix(); }
@@ -3915,13 +4075,14 @@
       Object.assign(fr, { jz: 0, jv: 0, waveEnd: 0, speed: 0 });
       ballHome(4.3, 5.0); ball.visible = true;                    // la pelota espera en la sala
       dog.visible = true; dogHome();                               // Marshall llega con el niño
+      playG.visible = true;                                        // la hamaca y el tobogán del patio
       doorLimits();
       DOORS.forEach(d => { d.th = d.w = d.hold = d.pull = 0; d.leaf.rotation.y = d.rot0; });
       fr.fly = reduceMotion ? null : { p0: camera.position.clone(), t0: controls.target.clone(), start: performance.now() };
       playFov();
       canvas.focus({ preventScroll: true });
     } else {
-      resetThings(); dog.visible = false; kid.root.visible = false; playMusic(null);
+      resetThings(); dog.visible = playG.visible = false; kid.root.visible = false; playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
       camera.fov = 42; camera.updateProjectionMatrix();
