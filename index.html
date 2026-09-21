@@ -327,7 +327,7 @@
     <div class="extra"><dt>Columnas</dt><dd>31<small>de 3.20 m</small></dd></div>
     <div class="extra"><dt>Lote</dt><dd>212<small>m²</small></dd></div>
     <div class="extra"><dt>Frente lote</dt><dd>7.98<small>m</small></dd></div>
-    <div class="extra"><dt>Al vecino</dt><dd id="lot-gap">2.48<small>m</small></dd></div>
+    <div class="extra"><dt>Al vecino</dt><dd id="lot-gap">2.50<small>m</small></dd></div>
   </dl>
   <details class="spaces" id="spaces" open>
     <summary><span class="sec-h">Espacios</span><span class="sum-note">medidas a ejes</span><i class="chev"></i></summary>
@@ -1100,11 +1100,12 @@
      - BOQ, medido a lo largo de la colindancia 4-1 desde la calle: depth, fondo libre del boquete del lado derecho, que es el más
        corto porque la calle va sesgada (la dueña midió un garaje de 4.50 m donde un carro cabía bien); wall, grueso del muro de
        contención de atrás; gap, del muro al frente de la casa, para el talón del muro, el desagüe y conectar después la losa.
-       La dueña pidió el 2026-09-21 que la casa arrancara a 6.00 m de la calle por el lado más cercano, así que gap bajó de 1.00
-       a 0.80: el garaje conserva los 5.00 m de fondo que ella midió y lo que se recorta es la franja del frente.
+       La dueña pidió el 2026-09-21 que la casa arrancara a 6.00 m de la calle por el lado más cercano (gap de 1.00 a 0.80) y ese
+       mismo día la devolvió a 6.20 m (gap 1.00), para que en la esquina izquierda de la casa quepan las gradas que bajan de la
+       losa a la grada de la orilla. El garaje conserva siempre los 5.00 m de fondo que ella midió.
        fall: pendiente del piso del boquete hacia la calle, para que escurra.
      - front: del vértice 1 al frente de la casa (borde de la losa del corredor), a lo largo de la colindancia 4-1 */
-  const BOQ = { depth: 5.0, wall: 0.2, gap: 0.8, fall: 0.015 };
+  const BOQ = { depth: 5.0, wall: 0.2, gap: 1.0, fall: 0.015 };
   const SITE = { front: BOQ.depth + BOQ.wall + BOQ.gap, side: 0.15 };
   {
     const dx = W / 2 + OVS + 0.05 + SITE.side - LOT[0][0], dz = Z(D + 0.08) + SITE.front - LOT[0][1];
@@ -1600,7 +1601,7 @@
   let losaY = 0, losaMid = [0, 0];
   // Para el juego: las gradas del frente de la casa (LF, en el plano), los postes y las columnas de la losa y su planta (para el
   // mapa). fitLosaFront acomoda las gradas del frente cuando se mueve la casa
-  let LF = { x0: 0, x1: 0, y0: 0, depth: 0, n: 3 }, losaPosts = [], losaCols = [], losaPoly = [], losaFront = null, fitLosaFront = () => {};
+  let LF = { x0: 0, x1: 0, y0: 0, depth: 0, n: 3, side: 0.3 }, losaPosts = [], losaCols = [], losaPoly = [], losaFront = null, fitLosaFront = () => {};
   {
     const conc = std({ color: 0xBEB9B1, map: T_concrete, roughness: .95 });
     const wood = std({ color: 0x9A6B3C, roughness: .7 });
@@ -1639,16 +1640,20 @@
        la casa y el muro, de la esquina izquierda de la casa hasta la colindancia derecha. Así la losa queda como una terraza a la
        que se sale directo del corredor (el primer escalón queda casi al ras del corredor y del contrapiso). Cuelgan de losaFront,
        que sigue a la casa: fitLosaFront() los vuelve a armar cuando se mueve (la franja crece o se achica) y los esconde si la
-       giran, porque ya no calzarían con el muro */
+       giran, porque ya no calzarían con el muro.
+       En la esquina izquierda doblan (pedido de la dueña, 2026-09-21: pasar de la losa a la grada de la orilla): cada escalón
+       sale LF.side más a la izquierda que el de arriba, así que de la losa se baja también hacia la izquierda, a nivel del
+       patio, justo donde arranca la grada */
     losaFront = new THREE.Group(); losaG.add(losaFront);
     fitLosaFront = () => {
       while (losaFront.children.length) losaFront.children.pop().geometry.dispose();
-      Object.assign(LF, { x0: -0.08, x1: W + 0.36, y0: D + 0.08, depth: BOQ.gap + MOVE.front, n: 3 });
+      Object.assign(LF, { x0: -0.08, x1: W + 0.36, y0: D + 0.08, depth: BOQ.gap + MOVE.front, n: 3, side: 0.3 });
       losaFront.visible = Math.abs(MOVE.turn) < 0.005 && LF.depth > 0.3;
       for (let k = 1; k <= LF.n; k++) {
         const top = losaY * k / (LF.n + 1), ya = LF.y0 + LF.depth * (k - 1) / LF.n, yb = LF.y0 + LF.depth;
-        const m = addBox(LF.x1 - LF.x0, top + 0.05, yb - ya, conc, X((LF.x0 + LF.x1) / 2), (top - 0.05) / 2, Z((ya + yb) / 2), losaFront);
-        scaleUV(m.geometry, (LF.x1 - LF.x0) / 3, 1 / 3);
+        const xa = LF.x0 - (LF.n - k) * LF.side;                             // la esquina: los de abajo salen más a la izquierda
+        const m = addBox(LF.x1 - xa, top + 0.05, yb - ya, conc, X((xa + LF.x1) / 2), (top - 0.05) / 2, Z((ya + yb) / 2), losaFront);
+        scaleUV(m.geometry, (LF.x1 - xa) / 3, 1 / 3);
       }
       losaFront.position.set(houseOff.x, 0, houseOff.z); losaFront.rotation.y = MOVE.turn;
     };
@@ -2936,8 +2941,10 @@
      p el mismo punto en el mundo. Las gradas del frente de la casa (LF) van en el plano. Sobre la losa se queda a 0.25 de la orilla de la calle y de la izquierda, donde va la baranda */
   function losaFloor(x, y, p) {
     if (!state.losa) return null;
-    if (losaFront.visible && x >= LF.x0 && x <= LF.x1 && y >= LF.y0 && y <= LF.y0 + LF.depth)
-      return losaY * Math.min(LF.n, Math.floor((y - LF.y0) / LF.depth * LF.n) + 1) / (LF.n + 1);
+    if (losaFront.visible && x >= LF.x0 - (LF.n - 1) * LF.side && x <= LF.x1 && y >= LF.y0 && y <= LF.y0 + LF.depth) {
+      const kY = Math.min(LF.n, Math.floor((y - LF.y0) / LF.depth * LF.n) + 1), kX = LF.n - Math.max(0, Math.ceil((LF.x0 - x) / LF.side));
+      return losaY * Math.min(kY, kX) / (LF.n + 1);
+    }
     if (vOf(p.x, p.z) < BOQ.depth + BOQ.wall && sIn(p.x, p.z) > 0.25 && eOf(p.x, p.z) < -LEFT.open - 0.25 && wOf(p.x, p.z) < 0) return losaY;
     return null;
   }
@@ -3871,6 +3878,7 @@
     if (DOG.chase && (t > DOG.chase || (ballSp < 0.25 && toBall < 0.6))) DOG.chase = 0;
     let tx, ty, stopAt;
     if (DOG.chase) { tx = BALL.x; ty = BALL.y; stopAt = 0; }
+    else if (DOG.pet > t) { tx = fr.x + Math.sin(fr.yawT) * 0.4; ty = fr.y + Math.cos(fr.yawT) * 0.4; stopAt = 0.05; }
     else { tx = fr.x - Math.sin(fr.yaw) * 0.75 + Math.cos(fr.yaw) * 0.3; ty = fr.y - Math.cos(fr.yaw) * 0.75 - Math.sin(fr.yaw) * 0.3; stopAt = 0.25; }
     // Si el niño (o la pelota) quedó al otro lado de una pared con puerta, primero va al centro del vano y lo cruza
     for (const d of DOORS) {
@@ -3884,8 +3892,9 @@
     }
     const dx = tx - DOG.x, dy = ty - DOG.y, dist = Math.hypot(dx, dy);
     let v = 0;
-    if (dist > stopAt && !(DOG.pet > t)) v = DOG.chase || dist > 2 ? 2.5 : Math.max(0.5, Math.min(1.2, dist * 1.6));
+    if (dist > stopAt) v = DOG.pet > t ? Math.min(1, dist * 3) : DOG.chase || dist > 2 ? 2.5 : Math.max(0.5, Math.min(1.2, dist * 1.6));
     if (v > 0.05) DOG.yaw += Math.atan2(Math.sin(Math.atan2(dx, dy) - DOG.yaw), Math.cos(Math.atan2(dx, dy) - DOG.yaw)) * Math.min(1, dt * 7);
+    else if (DOG.pet > t) { const a = Math.atan2(fr.x - DOG.x, fr.y - DOG.y); DOG.yaw += Math.atan2(Math.sin(a - DOG.yaw), Math.cos(a - DOG.yaw)) * Math.min(1, dt * 6); }
     // Camina hacia donde mira (así da la vuelta como un perro) en pasitos, deslizándose por las paredes
     const x0 = DOG.x, y0 = DOG.y, step = v * dt, n = Math.max(1, Math.ceil(step / 0.04));
     for (let i = 0; i < n; i++) {
@@ -3939,7 +3948,10 @@
     dog.position.set(X(DOG.x), DOG.h, Z(DOG.y)); dog.rotation.y = DOG.yaw;
   }
   // Acariciarlo: se sienta, menea la cola a toda velocidad y ladra contento; el niño se agacha y le pasa la mano
-  function petDog() { DOG.pet = performance.now() / 1000 + 1.8; DOG.chase = 0; fr.petEnd = DOG.pet; express('feliz', 1.8); woof(); }
+  function petDog() {
+    DOG.pet = performance.now() / 1000 + 1.8; DOG.chase = 0; fr.petEnd = DOG.pet; express('feliz', 1.8); woof();
+    fr.yawT = Math.atan2(DOG.x - fr.x, DOG.y - fr.y);                        // se voltea hacia él
+  }
   THINGS.push({ d: (x, y) => dog.visible ? Math.hypot(x - DOG.x, y - DOG.y) : 1e9, r: 1.2, label: () => 'Acariciar a Marshall', icon: () => 'paw', act: petDog });
 
   /* ---------- juego: el patio de juegos ---------- */
