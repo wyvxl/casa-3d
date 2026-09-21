@@ -918,21 +918,23 @@
 
   // Medidas de referencia: cama 1.38 × 1.90, mesa de noche 0.42, ropero 1.20 × 0.58 × 2.00, mueble de cocina 0.60 × 0.90,
   // refri 0.63 × 0.65 × 1.75, barra de 1.82 × 0.55 a 1.06, bancos altos con asiento de 0.36 a 0.76, butacas de 0.70 × 0.68
+  // Las camas van en una esquina, para dejar un paso más amplio (pedido de la dueña, 2026-09-21)
   roomGroup('d1');
-  bed('-y', 0.04, 1.95, COL.sage);                                        // cabecera contra la pared del fondo, fuera de la ventana
-  fbox(0.72, 1.14, 0.06, 0.46, 0, 0.5, COL.woodL); lamp(0.93, 0.26, 0.5);  // mesa de noche bajo la ventana
-  fbox(0.07, 0.65, 1.08, 2.28, 0, 2.0, COL.woodL);                        // ropero contra la pared izquierda
-  fbox(0.65, 0.67, 1.63, 1.65, 0.9, 1.2, COL.woodD); fbox(0.65, 0.67, 1.71, 1.73, 0.9, 1.2, COL.woodD);
+  bed('+x', 2.96, 0.8, COL.sage);                                         // en la esquina del fondo y la sala, cabecera contra la sala
+  fbox(2.56, 2.94, 1.6, 1.98, 0, 0.5, COL.woodL); lamp(2.75, 1.79, 0.5);  // mesa de noche junto a la cabecera
+  fbox(0.07, 0.65, 1.25, 2.45, 0, 2.0, COL.woodL);                        // ropero contra la pared izquierda
+  fbox(0.65, 0.67, 1.81, 1.83, 0.9, 1.2, COL.woodD); fbox(0.65, 0.67, 1.89, 1.91, 0.9, 1.2, COL.woodD);
+  fbox(0.1, 0.84, 0.08, 0.5, 0, 0.42, 0x3E7CB1); fbox(0.09, 0.85, 0.07, 0.51, 0.42, 0.47, 0xF2C94C);   // baúl de juguetes bajo la ventana
+  fbox(0.3, 0.64, 0.04, 0.08, 0.2, 0.28, 0xF2C94C);
 
   roomGroup('d2');
-  bed('-x', 0.07, 5.3, COL.clay);                                         // cabecera contra la pared izquierda
-  fbox(1.2, 2.45, 4.4, 6.2, 0, 0.012, COL.rug);
-  fbox(0.07, 0.49, 4.08, 4.5, 0, 0.5, COL.woodL); lamp(0.28, 4.29, 0.5);
-  fbox(0.07, 0.49, 6.1, 6.52, 0, 0.5, COL.woodL);
+  bed('-x', 0.04, 4.8, COL.clay);                                         // en la esquina del fondo, contra la pared del pasillo y del baño
+  fbox(0.45, 2.35, 5.72, 6.3, 0, 0.012, COL.rug);                          // alfombra en la franja libre, para jugar
+  fbox(0.07, 0.49, 5.6, 6.02, 0, 0.5, COL.woodL); lamp(0.28, 5.81, 0.5);  // mesa de noche junto a la cabecera
   fbox(1.66, 2.86, 6.36, 6.93, 0, 2.0, COL.woodL);                        // ropero contra el frente, en la parte sin ventana
   fbox(2.23, 2.25, 6.34, 6.36, 0.9, 1.2, COL.woodD); fbox(2.27, 2.29, 6.34, 6.36, 0.9, 1.2, COL.woodD);
-  fbox(2.53, 2.93, 5.05, 5.95, 0, 0.8, COL.woodL);                        // cómoda
-  [0.22, 0.46, 0.7].forEach(z => fbox(2.515, 2.53, 5.12, 5.88, z - 0.005, z + 0.005, COL.woodD));
+  fbox(2.53, 2.93, 5.2, 6.1, 0, 0.8, COL.woodL);                          // cómoda contra la sala, lejos de la puerta
+  [0.22, 0.46, 0.7].forEach(z => fbox(2.515, 2.53, 5.27, 6.03, z - 0.005, z + 0.005, COL.woodD));
 
   roomGroup('bano');
   fbox(0.07, 0.9, 3.05, 3.93, 0, 0.05, COL.white);                        // ducha de 0.83 × 0.88
@@ -3392,7 +3394,7 @@
     { at: [4.25, 5.955], n: [0, -1], lights: [3, 4], reach: [4.25, 5.6] },
     { at: [4.25, 6.045], n: [0, 1], lights: [5], reach: [4.25, 6.45] },
     { at: [1.85, 2.455], n: [0, -1], lights: [0], reach: [1.55, 2.28] },
-    { at: [1.85, 4.045], n: [0, 1], lights: [1], reach: [1.55, 4.3] },
+    { at: [2.955, 4.3], n: [-1, 0], lights: [1], reach: [2.55, 4.45] },
     { at: [1.925, 2.85], n: [-1, 0], lights: [2], reach: [1.7, 3.3] },
     { at: [4.23, -0.045], n: [0, -1], lights: [6], reach: [4.23, -0.45], old: true },
   ];
@@ -3447,10 +3449,10 @@
   const THINGS = [
     ...[4.49, 5.55].map(y => ({ d: nearPoint(4.75, y), r: 0.7, label: () => 'Sentarse',
       act: () => startPose({ kind: 'sit', hx: 5.4, hy: y, cx: 4.9, cy: y, seat: 0.52, face: -Math.PI / 2, look: 0.95 }) })),
-    { d: nearRect(1.24, 2.66, 0.1, 2.05), r: 0.45, label: () => 'Acostarse',
-      act: () => startPose({ kind: 'lie', hx: 1.95, hy: 0.36, dx: 0, dy: -1, psi: 0, top: 0.53, cx: 1.95, cy: 1.2, look: 0.75 }) },
-    { d: nearRect(0.07, 2.08, 4.58, 6.02), r: 0.45, label: () => 'Acostarse',
-      act: () => startPose({ kind: 'lie', hx: 0.38, hy: 5.3, dx: -1, dy: 0, psi: Math.PI / 2, top: 0.53, cx: 1.2, cy: 5.3, look: 0.75 }) },
+    { d: nearRect(0.96, 2.96, 0.04, 1.56), r: 0.45, label: () => 'Acostarse',
+      act: () => startPose({ kind: 'lie', hx: 2.64, hy: 0.8, dx: 1, dy: 0, psi: -Math.PI / 2, top: 0.53, cx: 1.95, cy: 0.8, look: 0.75 }) },
+    { d: nearRect(0.04, 2.04, 4.04, 5.56), r: 0.45, label: () => 'Acostarse',
+      act: () => startPose({ kind: 'lie', hx: 0.36, hy: 4.8, dx: -1, dy: 0, psi: Math.PI / 2, top: 0.53, cx: 1.2, cy: 4.8, look: 0.75 }) },
     ...SWITCHES.map(sw => ({ d: nearPoint(...sw.reach), r: 0.55, label: () => sw.lights.some(lit) ? 'Apagar la luz' : 'Prender la luz', act: () => toggleSwitch(sw) })),
     { d: nearPoint(4.9, 2.25), r: 0.6, label: () => FRIDGE.target ? 'Cerrar la refri' : 'Abrir la refri',
       act: () => { FRIDGE.target = FRIDGE.target ? 0 : 1; doorSound(FRIDGE.target ? 'open' : 'close', 1.5); } },
