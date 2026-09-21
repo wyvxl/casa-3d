@@ -161,16 +161,29 @@
 
   .fallback{position:fixed;inset:0;display:grid;place-items:center;padding:24px 16px;text-align:center;color:var(--ink-2)}
 
-  /* Franco: modo videojuego. Se esconden el cajetín, las vistas, los controles y las etiquetas; quedan la barra de Franco
-     (con Salir de Franco) y los dos joysticks */
-  body.is-franco .tb,body.is-franco .rail,body.is-franco .hint,body.is-franco #labels{display:none!important}
-  body.is-franco #stage{cursor:grab}
-  .views button.franco,.views button.franco:hover{color:var(--accent)}
-  .franco-hud{position:fixed;inset:0;pointer-events:none}
-  .franco-hud>*{pointer-events:auto}
+  /* Jugar: el botón abre un submenú para escoger a Franco o a Alayna */
+  .play{position:relative;display:flex}
+  .views .play-btn,.views .play-btn:hover{color:var(--accent);border-right:0}
+  .views .play-btn[aria-expanded="true"]{background:var(--accent);color:var(--paper)}
+  .play-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:5;min-width:210px;padding:12px 0 4px}
+  .play-menu .sec-h{padding:0 14px 10px}
+  .views .play-menu .pm-item{display:flex;align-items:center;gap:12px;width:100%;padding:11px 14px;background:none;border:0;border-top:1px solid var(--rule);
+    font:600 18px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);text-align:left;cursor:pointer}
+  .views .play-menu .pm-item:hover{background:var(--paper-2)}
+  .pm-item i{width:22px;height:22px;flex:none;border:1.5px solid var(--ink);background:linear-gradient(var(--c) 55%,var(--c2) 55%)}
+  .pm-item small{margin-left:auto;font:500 12px/1 var(--body);letter-spacing:0;text-transform:none;color:var(--ink-2)}
+
+  /* El juego: se esconden el cajetín, las vistas, los controles y las etiquetas; quedan la barra del niño (con Salir del
+     juego) y los dos joysticks */
+  body.is-playing .tb,body.is-playing .rail,body.is-playing .hint,body.is-playing #labels{display:none!important}
+  body.is-playing #stage{cursor:grab}
+  .play-hud{position:fixed;inset:0;pointer-events:none}
+  .play-hud>*{pointer-events:auto}
   .fh-bar{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:16px;display:flex;align-items:stretch;max-width:calc(100% - 32px)}
-  .fh-who{display:flex;flex-direction:column;justify-content:center;gap:5px;padding:9px 14px 10px 12px;min-width:0}
+  .fh-who{display:flex;flex-direction:column;justify-content:center;gap:5px;padding:9px 14px 10px 12px;min-width:0;background:none;border:0;color:var(--ink);text-align:left;cursor:pointer;font:inherit}
+  .fh-who:hover{background:var(--paper-2)}
   .fh-who b{font:700 22px/.9 var(--display);letter-spacing:.03em;text-transform:uppercase}
+  .fh-who b::after{content:"⇄";margin-left:7px;font:600 15px/1 var(--body);color:var(--accent);vertical-align:2px}
   .fh-who span{font:500 12.5px/1.15 var(--body);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fh-btn{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:0 14px;background:none;border:0;border-left:1px solid var(--rule);color:var(--ink);font:600 13px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
   .fh-btn:hover{background:var(--paper-2)}
@@ -238,6 +251,8 @@
     .move-row label{letter-spacing:.1em}
     .move .note,#names-note{display:none}                     /* no aportan en pantalla chica */
 
+    /* el encabezado recorta lo que se sale de él, así que el submenú de Jugar va fijo en la pantalla, debajo */
+    .play-menu{position:fixed;top:calc(58px + env(safe-area-inset-top,0px));right:10px}
     .fh-bar{top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:10px;max-width:none}
     .fh-who{flex:1 1 auto;padding:8px 10px}
     .fh-who b{font-size:18px}
@@ -284,7 +299,14 @@
     <button type="button" id="v-frente" data-view="frente" aria-pressed="false">Frente</button>
     <button type="button" id="v-planta" data-view="planta" aria-pressed="false">Planta</button>
     <button type="button" id="v-lote" data-view="lote" aria-pressed="false">Lote</button>
-    <button type="button" id="v-franco" class="franco" title="Caminar por la casa con Franco">Franco</button>
+    <div class="play" id="play">
+      <button type="button" id="v-play" class="play-btn" aria-haspopup="true" aria-expanded="false" aria-controls="play-menu">Jugar</button>
+      <div class="play-menu panel" id="play-menu" hidden>
+        <p class="sec-h">¿Con quién juegas?</p>
+        <button type="button" class="pm-item" data-kid="franco"><i style="--c:#1F2124;--c2:#B04F6E"></i>Franco<small>camiseta negra</small></button>
+        <button type="button" class="pm-item" data-kid="alayna"><i style="--c:#A9C8EE;--c2:#E0527A"></i>Alayna<small>vestido celeste</small></button>
+      </div>
+    </div>
   </nav>
   <div class="sheet-grip" id="sheet-grip"><span></span></div>
   <div class="sheet-tabs" id="sheet-tabs">
@@ -340,11 +362,11 @@
 </div>
 
 <p class="hint" id="hint">Arrastra para girar · rueda para acercar · clic derecho para desplazar · toca un espacio para ver sus medidas</p>
-<div class="franco-hud" id="franco-hud" hidden>
+<div class="play-hud" id="play-hud" hidden>
   <div class="fh-bar panel">
-    <div class="fh-who"><b>Franco</b><span id="fh-room">Corredor</span></div>
+    <button type="button" class="fh-who" id="fh-swap"><b id="fh-name">Franco</b><span id="fh-room">Corredor</span></button>
     <button type="button" class="fh-btn" id="fh-roof" aria-pressed="true"><span class="box"></span>Techo</button>
-    <button type="button" class="fh-btn fh-exit" id="fh-exit">Salir de Franco</button>
+    <button type="button" class="fh-btn fh-exit" id="fh-exit">Salir del juego</button>
   </div>
   <div class="stick stick-move" id="stick-move" role="img" aria-label="Joystick para caminar"><span class="stick-lbl">Caminar</span><i class="knob"></i></div>
   <div class="stick stick-look" id="stick-look" role="img" aria-label="Joystick para mirar"><span class="stick-lbl">Mirar</span><i class="knob"></i></div>
@@ -2031,7 +2053,7 @@
     tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: p, t1: t, start: performance.now(), dur: 1100 };
   }
   function setView(name) {
-    if (fr.on) setFranco(false);                             // cualquier vista saca del modo Franco
+    if (fr.on) setGame(false);                               // cualquier vista saca del juego
     const v = VIEWS[name];
     document.querySelectorAll('.views button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === name)));
     state.view = name; setRoof(v.roof); setDims(state.dims || !!v.dims);
@@ -2067,91 +2089,399 @@
     if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(() => { hoverQueued = false; canvas.style.cursor = pick(lastMove) ? 'pointer' : ''; }); }
   });
 
-  /* ---------- franco: modo videojuego ---------- */
-  /* Pedido de la dueña, 2026-09-21: el botón Franco (al final de la barra de vistas) pasa la página a un modo videojuego con
-     Franco, su hijo de unos 5 años, en tercera persona. Se esconden los paneles y quedan una barra con Techo y Salir de Franco,
-     que devuelve a la vista de antes, y dos joysticks en pantalla: el de la izquierda camina (más lejos del centro, más
-     rápido) y el de la derecha gira la cámara. También sirven el teclado (WASD o flechas, Shift para correr, Esc para salir),
-     arrastrar sobre el modelo, la rueda para acercar y un control de videojuego. Franco cuelga de house, así que sigue a la
-     casa si la movieron o la giraron; su posición (fr.x, fr.y) va en coordenadas del plano. Choca con OBST y, afuera, se topa
-     en los mismos bordes que la casa en fitsAt */
+  /* ---------- niños: modo videojuego ---------- */
+  /* Pedido de la dueña, 2026-09-21: el botón Jugar (al final de la barra de vistas) abre un submenú para escoger a Franco o a
+     Alayna, sus hijos de unos 5 años, y pasa la página a un modo videojuego con ese niño en tercera persona. Se esconden los
+     paneles y quedan una barra —el nombre, que al tocarlo cambia de niño; Techo, y Salir del juego, que devuelve a la vista de
+     antes— y dos joysticks en pantalla: el de la izquierda camina (más lejos del centro, más rápido) y el de la derecha gira la
+     cámara. También sirven el teclado (WASD o flechas, Shift para correr, Esc para salir), arrastrar sobre el modelo, la rueda
+     para acercar y un control de videojuego. Los niños cuelgan de house, así que siguen a la casa si la movieron o la giraron;
+     la posición del que se juega (fr.x, fr.y) va en coordenadas del plano. Choca con OBST y, afuera, se topa en los mismos
+     bordes que la casa en fitsAt */
 
-  // Franco, sacado de sus fotos (../Franco.jpg y ../Franco1.jpg): 1.10 m, pelo castaño muy rizado y abultado que le tapa las
-  // orejas, camiseta negra con una carita feliz blanca en el pecho, pantaloneta frambuesa y tenis grises de suela blanca.
-  // Mira hacia +Z y los pies quedan en y = 0
-  const franco = new THREE.Group(); franco.visible = false; house.add(franco);
-  const frBody = new THREE.Group(); franco.add(frBody);
-  const FRC = { skin: 0xE8B997, shirt: 0x1F2124, shorts: 0xAD4B6B, shoe: 0x6C7278, sole: 0xEEEEEA, eye: 0x2B1D15, mouth: 0xC9786F,
-    hair: [0x4E2B1B, 0x62371F, 0x7A4629] };
-  const frMat = c => std({ color: c, roughness: .8 });
-  const frM = { skin: frMat(FRC.skin), shirt: frMat(FRC.shirt), shorts: frMat(FRC.shorts), shoe: frMat(FRC.shoe), sole: frMat(FRC.sole),
-    eye: std({ color: FRC.eye, roughness: .3 }), mouth: frMat(FRC.mouth) };
-  const frPart = (geo, m, x, y, z, parent = frBody) => {
+  /* Piezas comunes. Los dos niños comparten el esqueleto: cabeza, hombros con codo y mano, y caderas con rodilla y pie, para
+     mover todo al caminar. Miran hacia +Z, los pies quedan en y = 0 y miden 1.10 m sin el pelo; scale los agranda o achica */
+  const kidMat = (c, o) => std(Object.assign({ color: c, roughness: .8 }, o));
+  const kidPart = (geo, m, x, y, z, parent) => {
     const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.userData.noPick = true; parent.add(o); return o;
   };
-  // La carita feliz va pintada en la camiseta. El tronco se gira media vuelta para que el centro del lienzo quede adelante;
-  // un poco a la derecha del centro del lienzo es la izquierda de él, como en la foto
-  const shirtCv = document.createElement('canvas'); shirtCv.width = 512; shirtCv.height = 208;
-  {
-    const g = shirtCv.getContext('2d'), cx = 268, cy = 60;
-    g.fillStyle = '#1F2124'; g.fillRect(0, 0, 512, 208);
-    g.strokeStyle = g.fillStyle = '#F4F2EC'; g.lineWidth = 3.2;
-    g.beginPath(); g.ellipse(cx, cy, 19, 16, 0, 0, Math.PI * 2); g.stroke();
-    [-7, 7].forEach(dx => { g.beginPath(); g.ellipse(cx + dx, cy - 4, 2.2, 3.4, 0, 0, Math.PI * 2); g.fill(); });
-    g.beginPath(); g.ellipse(cx, cy + 1, 10, 8, 0, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+  const lathe = (pts, seg = 40) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+  // Pinta una geometría de un color (para juntarla con otras en una sola malla con colores por vértice)
+  const tint = (geo, c, c2, along) => {
+    const a = new THREE.Color(c), b = new THREE.Color(c2 == null ? c : c2), p = geo.attributes.position, out = new Float32Array(p.count * 3), k = new THREE.Color();
+    for (let i = 0; i < p.count; i++) { k.copy(a).lerp(b, along ? along(i) : 0); out[3 * i] = k.r; out[3 * i + 1] = k.g; out[3 * i + 2] = k.b; }
+    geo.setAttribute('color', new THREE.BufferAttribute(out, 3)); return geo;
+  };
+  // Junta geometrías (con o sin índice, ya colocadas) en una sola, para que el pelo sea un solo objeto
+  function mergeGeo(list) {
+    const pos = [], nor = [], col = [], idx = []; let off = 0;
+    list.forEach(g => {
+      const p = g.attributes.position, n = g.attributes.normal, c = g.attributes.color;
+      for (let i = 0; i < p.count; i++) { pos.push(p.getX(i), p.getY(i), p.getZ(i)); nor.push(n.getX(i), n.getY(i), n.getZ(i)); col.push(c.getX(i), c.getY(i), c.getZ(i)); }
+      if (g.index) for (let i = 0; i < g.index.count; i++) idx.push(g.index.getX(i) + off);
+      else for (let i = 0; i < p.count; i++) idx.push(i + off);
+      off += p.count; g.dispose();
+    });
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    out.setIndex(idx); return out;
   }
-  const shirtTex = new THREE.CanvasTexture(shirtCv); shirtTex.anisotropy = maxAniso;
-  // Tronco: camiseta, hombros y pantaloneta. Cuello y cabeza con la cara
-  const frTorso = frPart(new THREE.CylinderGeometry(0.112, 0.12, 0.32, 32), [std({ map: shirtTex, roughness: .85 }), frM.shirt, frM.shirt], 0, 0.68, 0);
-  frTorso.rotation.y = Math.PI; frTorso.scale.z = 0.74;
-  frPart(new THREE.SphereGeometry(0.113, 24, 12), frM.shirt, 0, 0.83, 0).scale.set(1, 0.42, 0.74);
-  frPart(new THREE.CylinderGeometry(0.121, 0.125, 0.14, 24), frM.shorts, 0, 0.525, 0).scale.z = 0.76;
-  frPart(new THREE.CylinderGeometry(0.038, 0.042, 0.08, 14), frM.skin, 0, 0.875, 0);
-  const frHead = new THREE.Group(); frHead.position.y = 0.985; frBody.add(frHead);
-  frPart(new THREE.SphereGeometry(0.1, 24, 18), frM.skin, 0, 0, 0, frHead).scale.set(0.95, 1.05, 1);
-  [-1, 1].forEach(s => frPart(new THREE.SphereGeometry(0.012, 10, 8), frM.eye, s * 0.034, 0.012, 0.09, frHead));
-  frPart(new THREE.SphereGeometry(0.011, 10, 8), frM.skin, 0, -0.014, 0.1, frHead);                          // nariz
-  frPart(new THREE.SphereGeometry(0.016, 12, 8), frM.mouth, 0, -0.043, 0.09, frHead).scale.set(1.4, 0.45, 0.5);
-  // Pelo rizado: bolitas de tres tonos repartidas sobre la cabeza, más abultado arriba. De frente se queda en la frente;
-  // a los lados y atrás baja hasta la nuca y tapa las orejas. Van en una sola malla para no sumar objetos
-  {
-    const r = rng(505), base = new THREE.IcosahedronGeometry(1, 1), bp = base.attributes.position, bn = base.attributes.normal;
-    const pos = [], nor = [], col = [], shades = FRC.hair.map(c => new THREE.Color(c)), N = 170, GA = Math.PI * (3 - Math.sqrt(5));
-    for (let i = 0; i < N; i++) {
-      const y = 1 - 2 * (i + 0.5) / N, rad = Math.sqrt(1 - y * y), x = Math.cos(i * GA) * rad, z = Math.sin(i * GA) * rad;
-      if (y < (z > 0 ? -0.35 + 0.77 * z : -0.35)) continue;
-      const s = 0.03 + r() * 0.017, R = 0.108 + 0.028 * Math.max(0, y) + r() * 0.012, c = shades[(r() * 3) | 0];
-      for (let k = 0; k < bp.count; k++) {
-        pos.push(x * R + bp.getX(k) * s, y * R * 1.04 + bp.getY(k) * s, z * R + bp.getZ(k) * s);
-        nor.push(bn.getX(k), bn.getY(k), bn.getZ(k)); col.push(c.r, c.g, c.b);
+  // Mechón: un tubo por una curva, más delgado en la punta y con el color que cambia de la raíz (c0) a la punta (c1). Con
+  // flat, se aplana como una cinta acostada sobre la cabeza (más delgado hacia afuera y más ancho alrededor)
+  function lock(pts, r, c0, c1, tip = 0.45, seg = 20, rad = 6, flat = 0) {
+    const curve = new THREE.CatmullRomCurve3(pts.map(p => new V3(...p))), g = new THREE.TubeGeometry(curve, seg, r, rad, false);
+    const p = g.attributes.position, c = new V3(), v = new V3(), rd = new V3();
+    for (let i = 0; i <= seg; i++) {
+      curve.getPointAt(i / seg, c); const k = 1 - tip * i / seg;
+      rd.set(c.x, 0, c.z).normalize();
+      for (let j = 0; j <= rad; j++) {
+        const n = i * (rad + 1) + j; v.fromBufferAttribute(p, n).sub(c).multiplyScalar(k);
+        const out = v.dot(rd); v.addScaledVector(rd, -out).multiplyScalar(1 + flat * 0.8).addScaledVector(rd, out * (1 - flat)).add(c);
+        p.setXYZ(n, v.x, v.y, v.z);
       }
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    frPart(g, std({ vertexColors: true, roughness: .95, flatShading: true }), 0, 0, 0, frHead);
+    g.computeVertexNormals();
+    return tint(g, c0, c1, n => Math.floor(n / (rad + 1)) / seg);
   }
-  // Brazos con manga corta y piernas con la pantaloneta: cuelgan del hombro y de la cadera para poder mecerlos al caminar
-  const frArms = [-1, 1].map(s => {
-    const g = new THREE.Group(); g.position.set(s * 0.146, 0.81, 0); g.rotation.z = s * 0.1; frBody.add(g);
-    frPart(new THREE.CylinderGeometry(0.046, 0.043, 0.12, 14), frM.shirt, 0, -0.045, 0, g);
-    frPart(new THREE.CylinderGeometry(0.032, 0.028, 0.27, 12), frM.skin, 0, -0.225, 0, g);
-    frPart(new THREE.SphereGeometry(0.037, 12, 9), frM.skin, 0, -0.37, 0.006, g);
-    return g;
+  // Direcciones repartidas parejo sobre una esfera (espiral de Fibonacci), para sembrar el pelo
+  const sphereDirs = n => Array.from({ length: n }, (_, i) => {
+    const y = 1 - 2 * (i + 0.5) / n, rad = Math.sqrt(1 - y * y), a = i * Math.PI * (3 - Math.sqrt(5));
+    return [Math.cos(a) * rad, y, Math.sin(a) * rad];
   });
-  const frLegs = [-1, 1].map(s => {
-    const g = new THREE.Group(); g.position.set(s * 0.061, 0.52, 0); frBody.add(g);
-    frPart(new THREE.CylinderGeometry(0.063, 0.06, 0.2, 14), frM.shorts, 0, -0.06, 0, g);
-    frPart(new THREE.CylinderGeometry(0.041, 0.034, 0.3, 12), frM.skin, 0, -0.295, 0, g);
-    frPart(new THREE.BoxGeometry(0.084, 0.06, 0.16), frM.shoe, 0, -0.482, 0.022, g);
-    frPart(new THREE.BoxGeometry(0.088, 0.022, 0.166), frM.sole, 0, -0.509, 0.022, g);
+  const hairMat = () => std({ vertexColors: true, roughness: .7, metalness: .05 });
+
+  /* Cabeza: esfera de 0.10 m, un poco angosta, con la quijada y la nuca que se cierran hacia abajo. La cara va pintada en un
+     lienzo de 1024 × 512 que envuelve la esfera (el frente cae en u = 0.25); facePx pasa un punto de la cara, en metros, a
+     pixeles de ese lienzo, así las cejas, los cachetes y la boca quedan donde van los ojos de verdad */
+  function headGeo() {
+    const g = new THREE.SphereGeometry(0.1, 48, 32), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const d = Math.min(0, p.getY(i) / 0.1), z = p.getZ(i);
+      p.setXYZ(i, p.getX(i) * 0.95 * (1 - 0.2 * d * d), p.getY(i) * 1.05, z * (z < 0 ? 1 - 0.22 * d * d : 1 - 0.05 * d * d));
+    }
     return g;
-  });
+  }
+  const facePx = (x, y) => {
+    const xx = x / 0.95, yy = y / 1.05, z = Math.sqrt(Math.max(1e-6, 0.01 - xx * xx - yy * yy)), k = 1024 / 360 * 180 / Math.PI;
+    return [256 + Math.atan2(xx, z) * k, 256 - Math.asin(Math.max(-1, Math.min(1, yy / 0.1))) * k];
+  };
+  // Lo que es igual en las dos caras: la piel, los cachetes rosados y las narices
+  function faceTex(skin, blush, draw) {
+    const t = tex(1024, 512, g => {
+      g.fillStyle = skin; g.fillRect(0, 0, 1024, 512);
+      [-1, 1].forEach(s => {
+        const [x, y] = facePx(s * 0.056, -0.022), gr = g.createRadialGradient(x, y, 2, x, y, 34);
+        gr.addColorStop(0, blush); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - 40, y - 40, 80, 80);
+        const [nx, ny] = facePx(s * 0.0065, -0.027); g.fillStyle = 'rgba(90,40,30,.45)';
+        g.beginPath(); g.ellipse(nx, ny, 2.6, 1.8, 0, 0, Math.PI * 2); g.fill();
+      });
+      draw(g);
+    });
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
+  }
+  // Ojo: blanco, iris, pupila y brillo, con el párpado de arriba (pestañas) encima. Se cierra al parpadear (scale.y)
+  const eyeWhite = kidMat(0xF7F5F2, { roughness: .35 }), pupilM = kidMat(0x0E0B0A, { roughness: .2 }), glintM = std({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: .6 });
+  function kidEye(head, s, irisC, lashC, lashW, lashes) {
+    const g = new THREE.Group(); g.position.set(s * 0.034, 0.012, 0.086); g.rotation.y = s * 0.33; head.add(g);
+    kidPart(new THREE.SphereGeometry(0.0165, 18, 12), eyeWhite, 0, 0, 0, g).scale.set(1.15, 0.85, 0.55);
+    kidPart(new THREE.SphereGeometry(0.0105, 18, 12), kidMat(irisC, { roughness: .3 }), 0, -0.0005, 0.0066, g).scale.set(1, 1, 0.45);
+    kidPart(new THREE.SphereGeometry(0.0055, 12, 8), pupilM, 0, -0.0005, 0.0099, g).scale.set(1, 1, 0.4);
+    kidPart(new THREE.SphereGeometry(0.0022, 8, 6), glintM, -0.003, 0.0035, 0.0118, g);
+    const lashM = kidMat(lashC, { roughness: .6 });
+    kidPart(new THREE.TorusGeometry(0.0172, lashW, 6, 20, Math.PI), lashM, 0, -0.001, 0.0045, g).scale.set(1.14, 0.9, 1);
+    if (lashes) [0.35, 0.18, 0.02].forEach((a, i) => {                  // pestañas largas hacia la esquina de afuera
+      const l = kidPart(new THREE.BoxGeometry(0.0015, 0.0065, 0.0012), lashM, s * Math.cos(a) * 0.0195, Math.sin(a) * 0.016 + 0.002, 0.006, g);
+      l.rotation.z = -s * (0.9 - i * 0.25);
+    });
+    return g;
+  }
+  function kidRig(name, skin, scale) {
+    const root = new THREE.Group(); root.visible = false; root.scale.setScalar(scale); house.add(root);
+    const body = new THREE.Group(); root.add(body);
+    const head = new THREE.Group(); head.position.y = 0.985; body.add(head);
+    const skinM = kidMat(skin, { roughness: .62 });
+    const arms = [], elbows = [], legs = [], knees = [], feet = [];
+    [-1, 1].forEach(s => {
+      // Brazo: del hombro al codo 0.17, del codo a la muñeca 0.15; la mano con el pulgar hacia adelante
+      const sh = new THREE.Group(); sh.position.set(s * 0.143, 0.81, 0); sh.rotation.z = s * 0.1; body.add(sh); arms.push(sh);
+      kidPart(new THREE.SphereGeometry(0.034, 14, 10), skinM, 0, 0, 0, sh);
+      kidPart(new THREE.CylinderGeometry(0.033, 0.029, 0.17, 14), skinM, 0, -0.085, 0, sh);
+      const el = new THREE.Group(); el.position.y = -0.17; sh.add(el); elbows.push(el);
+      kidPart(new THREE.SphereGeometry(0.029, 12, 9), skinM, 0, 0, 0, el);
+      kidPart(new THREE.CylinderGeometry(0.029, 0.023, 0.15, 14), skinM, 0, -0.075, 0, el);
+      kidPart(new THREE.SphereGeometry(0.03, 14, 10), skinM, 0, -0.182, 0.004, el).scale.set(0.55, 1.15, 0.85);   // mano
+      const th = kidPart(new THREE.CylinderGeometry(0.0085, 0.0075, 0.03, 8), skinM, -s * 0.006, -0.168, 0.02, el);   // pulgar
+      th.rotation.x = 0.5;
+      // Pierna: de la cadera a la rodilla 0.235, de la rodilla al tobillo 0.235 (con la pantorrilla); el pie cuelga del tobillo
+      const hip = new THREE.Group(); hip.position.set(s * 0.062, 0.52, 0); body.add(hip); legs.push(hip);
+      kidPart(new THREE.CylinderGeometry(0.05, 0.042, 0.235, 14), skinM, 0, -0.117, 0, hip);
+      const kn = new THREE.Group(); kn.position.y = -0.235; hip.add(kn); knees.push(kn);
+      kidPart(new THREE.SphereGeometry(0.041, 12, 9), skinM, 0, 0, 0, kn);
+      kidPart(new THREE.CylinderGeometry(0.039, 0.028, 0.22, 14), skinM, 0, -0.11, 0, kn);
+      kidPart(new THREE.SphereGeometry(0.036, 12, 10), skinM, 0, -0.07, -0.008, kn).scale.set(1, 1.8, 1);          // pantorrilla
+      const ft = new THREE.Group(); ft.position.y = -0.235; kn.add(ft); feet.push(ft);
+    });
+    kidPart(new THREE.CylinderGeometry(0.037, 0.041, 0.09, 16), skinM, 0, 0.87, 0, body);                     // cuello
+    kidPart(new THREE.SphereGeometry(0.012, 12, 10), skinM, 0, -0.016, 0.097, head).scale.set(1, 0.9, 0.85);   // nariz
+    [-1, 1].forEach(s => kidPart(new THREE.SphereGeometry(0.022, 12, 10), skinM, s * 0.093, -0.008, -0.004, head).scale.set(0.45, 1, 0.7));   // orejas
+    return { name, root, body, head, arms, elbows, legs, knees, feet, skinM, eyes: [] };
+  }
+  // Suela vista desde arriba: punta ancha y talón angosto, 16.6 cm. y a lo largo del pie (la punta en −y, que al acostarla queda en +Z)
+  function footShape(k = 1) {
+    const s = new THREE.Shape(), m = (x, y) => [x * k, y * k];
+    s.moveTo(...m(0, 0.062));
+    s.bezierCurveTo(...m(0.024, 0.062), ...m(0.031, 0.04), ...m(0.032, 0));
+    s.bezierCurveTo(...m(0.034, -0.05), ...m(0.04, -0.075), ...m(0.03, -0.092));
+    s.bezierCurveTo(...m(0.02, -0.104), ...m(-0.02, -0.104), ...m(-0.03, -0.092));
+    s.bezierCurveTo(...m(-0.04, -0.075), ...m(-0.034, -0.05), ...m(-0.032, 0));
+    s.bezierCurveTo(...m(-0.031, 0.04), ...m(-0.024, 0.062), ...m(0, 0.062));
+    return s;
+  }
+  const footGeo = (k, depth, bevel, y0) => {
+    const g = new THREE.ExtrudeGeometry(footShape(k), { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.7, bevelSegments: 3, curveSegments: 14 });
+    g.rotateX(-Math.PI / 2); g.translate(0, y0, 0.022); return g;
+  };
+  // Tenis: suela blanca, capellada redondeada, puntera, cuello acolchado, lengüeta, cordones y una franja de color a los lados.
+  // El tobillo queda en y = 0 y el piso en −0.05
+  function sneaker(ft, o) {
+    kidPart(footGeo(1, 0.018, 0.003, -0.047), kidMat(o.sole, { roughness: .6 }), 0, 0, 0, ft);
+    const up = kidMat(o.upper, { roughness: .85 }), ug = footGeo(0.82, 0.02, 0.016, -0.03), p = ug.attributes.position;
+    for (let i = 0; i < p.count; i++) if (p.getZ(i) > 0) p.setY(i, -0.03 + (p.getY(i) + 0.03) * (1 - 0.55 * Math.min(1, p.getZ(i) / 0.126)));
+    ug.computeVertexNormals();
+    kidPart(ug, up, 0, 0, 0, ft);
+    kidPart(new THREE.SphereGeometry(0.033, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), kidMat(o.toe || o.upper, { roughness: .8 }), 0, -0.029, 0.083, ft).scale.set(1, 0.62, 0.95);
+    kidPart(new THREE.TorusGeometry(0.032, 0.008, 8, 20), up, 0, 0.004, -0.008, ft).rotation.x = Math.PI / 2 - 0.25;   // cuello
+    const tongue = kidPart(new THREE.BoxGeometry(0.034, 0.006, 0.06), kidMat(o.panel || o.upper), 0, 0.006, 0.03, ft); tongue.rotation.x = 0.16;
+    const lace = kidMat(o.lace || 0xF3F3F0, { roughness: .7 });
+    [0.018, 0.036, 0.054].forEach(z => { const l = kidPart(new THREE.BoxGeometry(0.036, 0.004, 0.006), lace, 0, 0.0095 - 0.0016 - z * 0.157, z, ft); l.rotation.x = 0.16; });
+    if (o.accent) [-1, 1].forEach(s => {
+      const a = kidPart(new THREE.BoxGeometry(0.003, 0.01, 0.07), kidMat(o.accent), s * 0.033, -0.022, 0.03, ft); a.rotation.x = -0.28;
+    });
+  }
+
+  // Franco, sacado de sus fotos (../Franco.jpg y ../Franco1.jpg): 1.10 m, piel clara, pelo castaño muy rizado y abultado, con
+  // puntas cobrizas, que le tapa las orejas; camiseta negra de cuello redondo con una carita feliz blanca en el pecho,
+  // pantaloneta frambuesa de tela con bolsas y el ruedo doblado, y tenis grises de suela blanca con detalles azules
+  const franco = kidRig('Franco', 0xECC3A4, 1);
+  {
+    const { body, head, arms, legs, feet } = franco;
+    kidPart(headGeo(), std({ map: faceTex('#ECC3A4', 'rgba(232,120,110,.42)', g => {
+      [-1, 1].forEach(s => {                                            // cejas finas, castaño claro
+        const [x, y] = facePx(s * 0.036, 0.043); g.strokeStyle = '#8A5A3B'; g.lineWidth = 5; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(x - s * 20, y + 5); g.quadraticCurveTo(x, y - 6, x + s * 22, y + 2); g.stroke();
+      });
+      const [mx, my] = facePx(0, -0.046);                               // boca pequeña, un poco abierta, como en las fotos
+      g.fillStyle = '#7A3430'; g.beginPath(); g.ellipse(mx, my + 1, 12, 5, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#D98C83'; g.beginPath(); g.moveTo(mx - 26, my); g.quadraticCurveTo(mx - 10, my - 9, mx, my - 5); g.quadraticCurveTo(mx + 10, my - 9, mx + 26, my);
+      g.quadraticCurveTo(mx + 12, my - 2, mx, my - 2); g.quadraticCurveTo(mx - 12, my - 2, mx - 26, my); g.fill();
+      g.beginPath(); g.moveTo(mx - 22, my + 2); g.quadraticCurveTo(mx, my + 17, mx + 22, my + 2); g.quadraticCurveTo(mx, my + 7, mx - 22, my + 2); g.fill();
+    }), roughness: .6 }), 0, 0, 0, head);
+    franco.eyes = [-1, 1].map(s => kidEye(head, s, 0x6B4428, 0x3A2419, 0.0017, false));
+    // Camiseta: tronco con forma de niño (pancita incluida), costuras a los lados, ruedo pespunteado y la carita del pecho.
+    // Se gira media vuelta para que el centro del lienzo quede adelante; un poco a la derecha del centro es la izquierda de él
+    const shirtTex = tex(512, 256, (g, w, h, r) => {
+      g.fillStyle = '#1E2023'; g.fillRect(0, 0, w, h);
+      speckle(g, w, h, r, 2600, ['rgba(255,255,255,.035)', 'rgba(0,0,0,.2)'], [1, 2]);
+      g.fillStyle = 'rgba(255,255,255,.07)'; [128, 384].forEach(x => g.fillRect(x - 1, 0, 2, h));
+      g.strokeStyle = 'rgba(255,255,255,.12)'; g.setLineDash([4, 4]); g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(0, h - 9); g.lineTo(w, h - 9); g.stroke(); g.setLineDash([]);
+      const cx = 268, cy = 96; g.strokeStyle = g.fillStyle = '#F2F0EA'; g.lineWidth = 3.4;
+      g.beginPath(); g.ellipse(cx, cy, 19, 15, 0, 0, Math.PI * 2); g.stroke();
+      [-7, 7].forEach(dx => { g.beginPath(); g.ellipse(cx + dx, cy - 4, 2.3, 3.4, 0, 0, Math.PI * 2); g.fill(); });
+      g.beginPath(); g.ellipse(cx, cy + 1, 10, 7.5, 0, 0.12 * Math.PI, 0.88 * Math.PI); g.stroke();
+    }, 41);
+    shirtTex.wrapT = THREE.ClampToEdgeWrapping;
+    const shirtM = kidMat(0xffffff, { map: shirtTex, roughness: .92 }), black = kidMat(0x222428, { roughness: .92 });
+    const torso = kidPart(lathe([[0.129, 0.5], [0.125, 0.53], [0.121, 0.56], [0.122, 0.59], [0.124, 0.62], [0.125, 0.65], [0.125, 0.68],
+      [0.124, 0.71], [0.122, 0.74], [0.12, 0.77], [0.116, 0.8], [0.105, 0.83], [0.085, 0.855], [0.06, 0.873], [0.046, 0.884]], 44), shirtM, 0, 0, 0, body);
+    torso.rotation.y = Math.PI; torso.scale.z = 0.74;
+    const collar = kidPart(new THREE.TorusGeometry(0.045, 0.0075, 8, 28), black, 0, 0.879, 0, body);          // cuello redondo
+    collar.rotation.x = Math.PI / 2; collar.scale.y = 0.8;
+    arms.forEach(a => {                                                 // manga corta con su ruedo
+      kidPart(new THREE.SphereGeometry(0.047, 16, 12), black, 0, 0.004, 0, a);
+      kidPart(new THREE.CylinderGeometry(0.047, 0.051, 0.1, 16, 1, true), black, 0, -0.045, 0, a).material.side = THREE.DoubleSide;
+      kidPart(new THREE.TorusGeometry(0.0505, 0.0045, 6, 20), black, 0, -0.095, 0, a).rotation.x = Math.PI / 2;
+    });
+    // Pantaloneta: tela de gabardina frambuesa con pretina, bolsas en diagonal, costura del centro y el ruedo doblado
+    const shortsTex = tex(256, 128, (g, w, h, r) => {
+      g.fillStyle = '#B04F6E'; g.fillRect(0, 0, w, h);
+      g.strokeStyle = 'rgba(80,20,40,.12)'; g.lineWidth = 1;
+      for (let i = -h; i < w; i += 4) { g.beginPath(); g.moveTo(i, h); g.lineTo(i + h, 0); g.stroke(); }
+      speckle(g, w, h, r, 900, ['rgba(255,255,255,.05)', 'rgba(60,10,30,.08)'], [1, 2]);
+      g.strokeStyle = 'rgba(70,15,35,.45)'; g.lineWidth = 2;
+      [[40, 1], [216, -1]].forEach(([x, s]) => { g.beginPath(); g.moveTo(x, 10); g.lineTo(x + s * 22, 60); g.stroke(); });
+      g.beginPath(); g.moveTo(1, 8); g.lineTo(1, 70); g.moveTo(w - 1, 8); g.lineTo(w - 1, 70); g.stroke();
+      g.fillStyle = 'rgba(70,15,35,.25)'; g.fillRect(0, 0, w, 9);
+    }, 43);
+    const shortsM = kidMat(0xffffff, { map: shortsTex, roughness: .9 }), cuffM = kidMat(0xC05E7D, { roughness: .9 });
+    kidPart(lathe([[0.121, 0.44], [0.124, 0.47], [0.124, 0.5], [0.122, 0.53], [0.119, 0.56], [0.117, 0.585]], 36), shortsM, 0, 0, 0, body).scale.z = 0.7;
+    legs.forEach(l => {
+      kidPart(new THREE.CylinderGeometry(0.066, 0.066, 0.19, 16, 1, true), shortsM, 0, -0.065, 0, l).material.side = THREE.DoubleSide;
+      kidPart(new THREE.TorusGeometry(0.066, 0.011, 8, 22), cuffM, 0, -0.158, 0, l).rotation.x = Math.PI / 2;
+    });
+    feet.forEach(f => sneaker(f, { sole: 0xF1F1EE, upper: 0x5E646B, panel: 0x858B92, toe: 0x6A7078, accent: 0x2F7FD1 }));
+    // Pelo rizado: un relleno oscuro pegado a la cabeza, encima cientos de rulitos (argollas y bolitas) que se aclaran hacia
+    // afuera, y unos rulos sueltos que caen en la frente, a los lados y en la nuca
+    const r = rng(505), parts = [], shade = ['#3B2216', '#553020', '#6E3F26', '#86502F', '#A0663A'];
+    const onHair = (x, y, z, front) => y >= (z > 0 ? -0.36 + front * z : -0.4);
+    sphereDirs(150).forEach(([x, y, z]) => {
+      if (!onHair(x, y, z, 1.08)) return;
+      const R = 0.104 + 0.028 * Math.max(0, y);
+      parts.push(tint(new THREE.SphereGeometry(0.036, 8, 6).translate(x * R, y * R * 1.05, z * R), shade[0]));
+    });
+    sphereDirs(420).forEach(([x, y, z]) => {
+      if (!onHair(x, y, z, 0.98)) return;
+      const R = 0.128 + 0.036 * Math.max(0, y) + r() * 0.012 - (z > 0.3 ? 0.022 * (z - 0.3) / 0.7 : 0);
+      const c = shade[1 + ((r() * 4) | 0)], px = x * R, py = y * R * 1.05, pz = z * R;
+      const g = r() < 0.6 ? new THREE.TorusGeometry(0.011 + r() * 0.004, 0.0088, 6, 12) : new THREE.SphereGeometry(0.017 + r() * 0.008, 7, 5);
+      g.rotateX(r() * 6.3).rotateY(r() * 6.3); g.translate(px, py, pz);
+      parts.push(tint(g, c));
+    });
+    [[0.03, 0.098, 0, 6], [-0.035, 0.096, 0, 6], [-0.085, 0.03], [0.09, 0.02], [-0.1, -0.03], [0.105, -0.035], [0.06, -0.06, -1], [-0.04, -0.07, -1], [0, -0.075, -1]]
+      .forEach(([x, y, back, n = 14], i) => {                           // rulos sueltos: una espiral corta que cuelga
+        const z = (back ? -1 : 1) * Math.sqrt(Math.max(0, 0.0165 - x * x - y * y)), pts = [];
+        for (let k = 0; k <= n; k++) { const a = k * 0.9 + i; pts.push([x + Math.cos(a) * 0.009, y - k * 0.0042, z + Math.sin(a) * 0.009]); }
+        parts.push(lock(pts, 0.0055, '#6E3F26', '#A56B3E', 0.3, 28, 5));
+      });
+    kidPart(mergeGeo(parts), hairMat(), 0, 0, 0, head);
+  }
+
+  // Alayna, sacada de sus fotos (../alayna.jpg y ../Alayna2.jpg): 1.12 m, piel trigueña, ojos grandes café oscuro con pestañas
+  // largas, sonrisa grande con dientes, pelo castaño oscuro ondulado hasta los hombros, con raya al medio, las puntas más claras
+  // y un lazo rosado de satín y tul arriba; el vestido celeste de cuadritos de la foto de la playa, fruncido en el pecho, con
+  // vuelos de encaje blanco calado en los hombros y la falda con pliegues hasta la rodilla. Zapatitos rosados con tirita
+  const alayna = kidRig('Alayna', 0xD8A07A, 1.02);
+  {
+    const { body, head, arms, feet } = alayna;
+    kidPart(headGeo(), std({ map: faceTex('#D8A07A', 'rgba(214,100,96,.38)', g => {
+      [-1, 1].forEach(s => {                                            // cejas oscuras y arqueadas
+        const [x, y] = facePx(s * 0.036, 0.044); g.strokeStyle = '#2A1810'; g.lineWidth = 6.5; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(x - s * 22, y + 7); g.quadraticCurveTo(x - s * 2, y - 8, x + s * 24, y + 1); g.stroke();
+        const [dx, dy] = facePx(s * 0.047, -0.05); g.strokeStyle = 'rgba(120,55,40,.35)'; g.lineWidth = 2.5;   // hoyuelos
+        g.beginPath(); g.arc(dx, dy, 5, s > 0 ? 2.2 : -0.3, s > 0 ? 3.4 : 0.9); g.stroke();
+      });
+      const [mx, my] = facePx(0, -0.047);                               // sonrisa grande con los dientes de arriba
+      g.fillStyle = '#5E1F1F'; g.beginPath(); g.moveTo(mx - 38, my - 6); g.quadraticCurveTo(mx, my + 2, mx + 38, my - 6);
+      g.quadraticCurveTo(mx + 26, my + 26, mx, my + 27); g.quadraticCurveTo(mx - 26, my + 26, mx - 38, my - 6); g.fill();
+      g.save(); g.clip();
+      g.fillStyle = '#FBF8F2'; g.fillRect(mx - 40, my - 8, 80, 16);
+      g.strokeStyle = 'rgba(160,150,140,.5)'; g.lineWidth = 1; [-18, -6, 6, 18].forEach(d => { g.beginPath(); g.moveTo(mx + d, my - 6); g.lineTo(mx + d, my + 7); g.stroke(); });
+      g.fillStyle = '#C0615C'; g.beginPath(); g.ellipse(mx, my + 23, 16, 7, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+      g.strokeStyle = '#B0544E'; g.lineWidth = 4; g.beginPath(); g.moveTo(mx - 38, my - 6); g.quadraticCurveTo(mx, my + 2, mx + 38, my - 6);
+      g.quadraticCurveTo(mx + 26, my + 26, mx, my + 27); g.quadraticCurveTo(mx - 26, my + 26, mx - 38, my - 6); g.stroke();
+    }), roughness: .6 }), 0, 0, 0, head);
+    alayna.eyes = [-1, 1].map(s => kidEye(head, s, 0x2E1B10, 0x120B08, 0.0026, true));
+    // Cuadritos: franjas celestes a lo largo y a lo ancho, más oscuras donde se cruzan. En el pecho, además, el fruncido
+    // (líneas de elástico cada 1.2 cm, con su sombrita)
+    const gingham = (rx, ry, smock) => {
+      const t = tex(128, 128, g => {
+        g.fillStyle = '#F6F8FC'; g.fillRect(0, 0, 128, 128);
+        g.fillStyle = 'rgba(112,160,222,.55)';
+        for (let i = 0; i < 128; i += 16) { g.fillRect(i, 0, 8, 128); g.fillRect(0, i, 128, 8); }
+        if (smock) for (let y = 3; y < 128; y += 11) {
+          g.fillStyle = 'rgba(40,60,90,.22)'; g.fillRect(0, y + 1.5, 128, 2); g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(0, y, 128, 1.5);
+        }
+      });
+      t.repeat.set(rx, ry); return t;
+    };
+    // Pecho y hombros en piel, bajo el escote; encima, el cuerpo del vestido fruncido
+    kidPart(lathe([[0.1, 0.78], [0.1, 0.81], [0.094, 0.835], [0.076, 0.858], [0.053, 0.876], [0.042, 0.888]], 36), alayna.skinM, 0, 0, 0, body).scale.z = 0.74;
+    kidPart(lathe([[0.114, 0.575], [0.113, 0.61], [0.115, 0.64], [0.118, 0.67], [0.119, 0.7], [0.118, 0.73], [0.115, 0.76], [0.11, 0.79],
+      [0.104, 0.815], [0.099, 0.832]], 44), std({ map: gingham(4, 1.6, true), roughness: .85, side: THREE.DoubleSide }), 0, 0, 0, body).scale.z = 0.76;
+    // Falda fruncida en la cintura: se abre hacia la rodilla y lleva pliegues que crecen hacia el ruedo
+    {
+      const g = lathe([[0.116, 0.588], [0.13, 0.555], [0.148, 0.51], [0.166, 0.46], [0.18, 0.41], [0.19, 0.36], [0.196, 0.325], [0.198, 0.305]], 96);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i), t = (0.588 - y) / 0.283, k = 1 + 0.075 * t * Math.sin(Math.atan2(x, z) * 16);
+        p.setXYZ(i, x * k, y, z * k);
+      }
+      g.computeVertexNormals();
+      alayna.skirt = kidPart(g, std({ map: gingham(9, 2.2), roughness: .85, side: THREE.DoubleSide }), 0, 0, 0, body);
+      alayna.skirt.scale.z = 0.86;
+    }
+    // Vuelos de encaje calado (bordado inglés): un cono con ondas y agujeritos en flor, sobre cada hombro
+    const eyelet = tex(128, 64, g => {
+      g.fillStyle = '#F4F3F5'; g.fillRect(0, 0, 128, 64);
+      g.globalCompositeOperation = 'destination-out';
+      for (let x = 8; x < 128; x += 16) for (let y = 10; y < 64; y += 22) {
+        const ox = (y / 22 | 0) % 2 ? 8 : 0; g.beginPath(); g.ellipse(x + ox, y, 2.8, 4.2, 0, 0, Math.PI * 2); g.fill();
+        [0, 1, 2, 3, 4].forEach(k => { const a = k * 1.2566; g.beginPath(); g.arc(x + ox + Math.cos(a) * 6, y + Math.sin(a) * 6, 1.5, 0, Math.PI * 2); g.fill(); });
+      }
+    });
+    eyelet.repeat.set(3, 1);
+    const ruffleM = std({ map: eyelet, roughness: .9, side: THREE.DoubleSide, alphaTest: 0.5, transparent: false });
+    arms.forEach(a => {
+      const g = new THREE.CylinderGeometry(0.043, 0.074, 0.075, 48, 2, true), p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), z = p.getZ(i), t = (0.0375 - p.getY(i)) / 0.075, k = 1 + 0.12 * t * Math.sin(Math.atan2(x, z) * 9);
+        p.setXYZ(i, x * k, p.getY(i), z * k);
+      }
+      g.computeVertexNormals();
+      kidPart(g, ruffleM, 0, -0.006, 0, a);
+      kidPart(new THREE.TorusGeometry(0.036, 0.009, 6, 18, Math.PI), std({ map: gingham(1, 0.4), roughness: .85 }), 0, 0.006, 0, a).rotation.y = Math.PI / 2;   // tirante
+    });
+    // Zapatitos rosados de charol con una tirita sobre el empeine
+    feet.forEach(f => {
+      kidPart(footGeo(1, 0.01, 0.002, -0.049), kidMat(0xF3E6EA, { roughness: .6 }), 0, 0, 0, f);
+      const pink = kidMat(0xE88FAA, { roughness: .35, metalness: .05 });
+      kidPart(footGeo(0.95, 0.008, 0.012, -0.04), pink, 0, 0, 0, f);
+      kidPart(new THREE.TorusGeometry(0.03, 0.004, 6, 18, Math.PI), pink, 0, -0.03, 0.02, f).scale.set(1.05, 0.9, 1);
+      kidPart(new THREE.SphereGeometry(0.006, 8, 6), kidMat(0xFFF4F0), 0.028, -0.024, 0.02, f);
+    });
+    // Pelo: un casco con raya al medio pegado a la cabeza (girado hacia atrás, así la frente queda despejada y atrás baja a la
+    // nuca) y encima mechones ondulados que caen por los lados y la espalda: atrás llegan a media espalda y a los lados se
+    // acomodan sobre los hombros y se abren en las puntas, más claras por el sol
+    const capTex = tex(256, 128, (g, w, h, r) => {
+      g.fillStyle = '#2E1C13'; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 700; i++) { const x = r() * w; g.strokeStyle = r() < .5 ? 'rgba(90,60,40,.35)' : 'rgba(10,5,3,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + (r() - .5) * 6, h); g.stroke(); }
+      g.fillStyle = '#C48E6A'; g.fillRect(62, 0, 3, 40);                   // la raya, hacia la frente
+    }, 47);
+    const cap = kidPart(new THREE.SphereGeometry(0.106, 36, 20, 0, Math.PI * 2, 0, 1.48), std({ map: capTex, roughness: .6 }), 0, 0.002, -0.003, head);
+    cap.scale.set(1, 1.07, 1.03); cap.rotation.x = -0.6;
+    const r = rng(707), locks = [], dark = '#2A1A11', mid = '#3D2618', light = '#6A4428';
+    const addLocks = (n, from, to, R0, width, c0, c1) => {
+      for (let i = 0; i < n; i++) {
+        const a = (from + (to - from) * (i + r() * 0.6) / n) * Math.PI / 180, side = Math.abs(a) > 1.1;
+        const el = (side ? 0.1 : 0.55) + r() * 0.1, end = Math.abs(a) > 1.75 ? -0.1 : side ? -0.13 - r() * 0.025 : -0.2 - r() * 0.035;
+        const ph = r() * 6.3, pts = [];
+        for (let k = 0; k <= 10; k++) {
+          const s = k / 10, y0 = Math.sin(el) * R0 * 1.05, y = y0 + (end - y0) * s;
+          const onHead = y > 0 ? Math.sqrt(Math.max(0, R0 * R0 - (y / 1.05) ** 2)) : R0;
+          const R = (y > 0 ? onHead : R0) + 0.008 + R0 * 0.35 * s * s + 0.012 * Math.sin(s * 9 + ph) * s + (side ? 0.03 * s : 0);
+          const aa = a + 0.06 * Math.sin(s * 7 + ph);
+          pts.push([Math.sin(aa) * R, y, -Math.cos(aa) * R]);
+        }
+        locks.push(lock(pts, width * (0.8 + r() * 0.4), c0, c1, 0.35, 22, 8, 0.6));
+      }
+    };
+    addLocks(52, -122, 122, 0.108, 0.017, mid, light);                   // capa de afuera
+    addLocks(34, -105, 105, 0.1, 0.019, dark, mid);                      // capa de adentro, para que no se vea hueco
+    [[-1, 0.05], [1, 0.04]].forEach(([s, y]) => {                        // mechones sueltos junto a la cara
+      const pts = []; for (let k = 0; k <= 8; k++) { const t = k / 8; pts.push([s * (0.092 + 0.02 * t), y - 0.14 * t, 0.045 - 0.02 * t + 0.01 * Math.sin(t * 8)]); }
+      locks.push(lock(pts, 0.009, mid, light, 0.6, 16, 5));
+    });
+    alayna.hair = kidPart(mergeGeo(locks), hairMat(), 0, 0, 0, head);
+    // Lazo rosado arriba, un poco hacia atrás: dos orejas de satín, otras dos de tul más grandes y transparentes, el nudo y
+    // dos puntas que caen
+    const bow = new THREE.Group(); bow.position.set(0, 0.118, -0.03); bow.rotation.x = -0.5; head.add(bow);
+    const satin = kidMat(0xE0527A, { roughness: .3, metalness: .1 }), tulle = std({ color: 0xF6A9BF, roughness: .8, transparent: true, opacity: .5, side: THREE.DoubleSide, depthWrite: false });
+    [-1, 1].forEach(s => {
+      const l = kidPart(new THREE.TorusGeometry(0.022, 0.01, 8, 20), satin, s * 0.03, 0, 0, bow); l.scale.set(1.35, 0.9, 0.5); l.rotation.z = s * 0.3;
+      const t = kidPart(new THREE.SphereGeometry(0.036, 14, 10), tulle, s * 0.036, 0.004, -0.004, bow); t.scale.set(1.3, 0.9, 0.5); t.castShadow = false;
+      const tail = kidPart(new THREE.BoxGeometry(0.014, 0.05, 0.003), satin, s * 0.012, -0.03, 0.006, bow); tail.rotation.z = s * 0.35;
+    });
+    kidPart(new THREE.SphereGeometry(0.014, 12, 10), satin, 0, 0, 0.002, bow).scale.set(1, 1.1, 0.8);
+  }
+  const KIDS = { franco, alayna };
+  let kid = franco;                                           // el que se está jugando
 
   const FR_R = 0.14;                                          // radio con que choca: los hombros de un niño de 5 años
   const LOOK_H = 1.15;                                        // la cámara mira un poco sobre su cabeza, para que él quede abajo
-  const fr = { on: false, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
+  const fr = { on: false, who: 'franco', blinkAt: 0, blinkEnd: 0, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
     wantX: 0, wantY: 0, prev: 'exterior', fly: null, room: '', look: new V3() };
   const clampPitch = p => Math.max(-0.12, Math.min(1.25, p));
   const inHouse = (x, y) => x >= -0.08 && x <= W + 0.08 && y >= -0.08 && y <= D + 0.08;
@@ -2391,7 +2721,7 @@
     e.preventDefault(); fr.dist = Math.max(1, Math.min(4.5, fr.dist * Math.exp(e.deltaY * 0.001)));
   }, { passive: false });
 
-  function francoStep(dt, now) {
+  function playStep(dt, now) {
     // Lo que pide el jugador. Los ejes van en pantalla: x a la derecha, y hacia adelante
     let [mx, my] = radial(stickMove.x, -stickMove.y), lx = dead(stickLook.x), ly = dead(stickLook.y);
     const pad = gamepad();
@@ -2429,19 +2759,30 @@
     }
     doorsStep(dt);
 
-    // Cuerpo: gira hacia donde camina, mece brazos y piernas según lo que avanzó y, quieto, respira y mira a los lados
+    // Cuerpo: gira hacia donde camina y, según lo que avanzó, mece las piernas (la rodilla se dobla cuando la pierna va hacia
+    // adelante y el pie se mantiene casi plano) y los brazos (el codo se dobla más en el brazo que va adelante). Quieto,
+    // respira y mira a los lados. Parpadea cada 2 a 5 s. A Alayna se le mecen la falda y el pelo
     const moved = Math.hypot(fr.x - x0, fr.y - y0), speed = moved / Math.max(dt, 1e-3);
     fr.phase += moved * Math.PI * 2 / 0.9;
     fr.amp += (Math.min(1, speed / 1.5) - fr.amp) * Math.min(1, dt * 10);
     fr.yaw += Math.atan2(Math.sin(fr.yawT - fr.yaw), Math.cos(fr.yawT - fr.yaw)) * Math.min(1, dt * 12);
-    const sw = Math.sin(fr.phase) * 0.6 * fr.amp, still = 1 - fr.amp, t = now / 1000;
-    frLegs[0].rotation.x = sw; frLegs[1].rotation.x = -sw;
-    frArms[0].rotation.x = -sw * 0.9; frArms[1].rotation.x = sw * 0.9;
-    frBody.position.y = Math.abs(Math.cos(fr.phase)) * 0.024 * fr.amp + Math.sin(t * 2.4) * 0.003 * still;
-    frBody.rotation.x = 0.06 * fr.amp;
-    frHead.rotation.y = Math.sin(t * 0.7) * 0.3 * still;
+    const A = fr.amp, ph = fr.phase, sn = Math.sin(ph), cs = Math.cos(ph), sw = sn * 0.55 * A, still = 1 - A, t = now / 1000;
+    [sw, -sw].forEach((hip, i) => {
+      const knee = 0.05 + Math.max(0, i ? cs : -cs) * 0.95 * A;
+      kid.legs[i].rotation.x = hip; kid.knees[i].rotation.x = knee; kid.feet[i].rotation.x = -(hip + knee) * 0.75;
+      kid.arms[i].rotation.x = -hip * 0.85;
+      kid.elbows[i].rotation.x = -0.18 - 0.35 * A * Math.max(0, i ? -sn : sn);
+    });
+    kid.body.position.y = Math.abs(cs) * 0.022 * A + Math.sin(t * 2.4) * 0.003 * still;
+    kid.body.rotation.x = 0.06 * A; kid.body.rotation.y = sn * 0.07 * A;
+    kid.head.rotation.y = Math.sin(t * 0.7) * 0.3 * still - kid.body.rotation.y;
+    kid.head.rotation.x = Math.sin(t * 0.43) * 0.06 * still;
+    if (t > fr.blinkAt) { fr.blinkEnd = t + 0.12; fr.blinkAt = t + 2 + Math.random() * 3; }
+    kid.eyes.forEach(e => { e.scale.y = t < fr.blinkEnd ? 0.1 : 1; });
+    if (kid.skirt) { kid.skirt.rotation.x = -0.05 * A + Math.sin(ph * 2) * 0.025 * A; kid.skirt.rotation.z = sn * 0.03 * A; }
+    if (kid.hair) kid.hair.rotation.x = 0.06 * A + Math.sin(ph * 2) * 0.012 * A;
     fr.h += (floorAt(fr.x, fr.y) - fr.h) * Math.min(1, dt * 14);
-    franco.position.set(X(fr.x), fr.h, Z(fr.y)); franco.rotation.y = fr.yaw;
+    kid.root.position.set(X(fr.x), fr.h, Z(fr.y)); kid.root.rotation.y = fr.yaw;
     const room = roomAt(fr.x, fr.y);
     if (room !== fr.room) { fr.room = room; roomEl.textContent = room; }
 
@@ -2458,7 +2799,7 @@
     toHouse(camWant.set(X(cx), ch, Z(cy)));
     camWant.y = Math.max(camWant.y, (state.boq ? boqY : groundY)(camWant.x, camWant.z) + 0.3);
     toHouse(lookWant.set(X(fr.x), fr.h + LOOK_H, Z(fr.y)));
-    franco.visible = fr.camD > 0.45;
+    kid.root.visible = fr.camD > 0.45;
     if (fr.fly) {                                             // al entrar, la cámara vuela desde la vista de antes
       const k = Math.min(1, (now - fr.fly.start) / 1100), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
       camera.position.lerpVectors(fr.fly.p0, camWant, e); fr.look.lerpVectors(fr.fly.t0, lookWant, e);
@@ -2467,31 +2808,48 @@
     camera.lookAt(fr.look);
   }
 
-  const hud = $('#franco-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof');
-  function francoFov() { camera.fov = camera.aspect < 1 ? 70 : 60; camera.updateProjectionMatrix(); }
-  function setFranco(on) {
-    if (on === fr.on) return;
-    fr.on = on; franco.visible = on; hud.hidden = !on; controls.enabled = !on;
-    document.body.classList.toggle('is-franco', on);
+  const hud = $('#play-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof'), swapBtn = $('#fh-swap');
+  const playBtn = $('#v-play'), playMenu = $('#play-menu');
+  function playFov() { camera.fov = camera.aspect < 1 ? 70 : 60; camera.updateProjectionMatrix(); }
+  // Cambia el niño que se juega; el otro se esconde. Sigue en el mismo lugar, mirando para el mismo lado
+  function setKid(who) {
+    kid.root.visible = false;
+    fr.who = who; kid = KIDS[who]; kid.root.visible = fr.on;
+    const other = KIDS[who === 'franco' ? 'alayna' : 'franco'].name;
+    $('#fh-name').textContent = kid.name;
+    swapBtn.title = `Cambiar a ${other}`; swapBtn.setAttribute('aria-label', `Jugando con ${kid.name}. Cambiar a ${other}`);
+  }
+  function setGame(on, who) {
+    if (on === fr.on) { if (on && who) setKid(who); return; }
+    fr.on = on; hud.hidden = !on; controls.enabled = !on;
+    document.body.classList.toggle('is-playing', on);
     keys.clear(); lookDrag = null; resetSticks.forEach(f => f());
     if (on) {
       fr.prev = state.view; tween = null; select(null);
       if (mob.matches) setTab(null);
+      setKid(who || fr.who || 'franco');
       // Arranca en el corredor, frente a la puerta principal, con la cámara detrás
-      Object.assign(fr, { x: 3.54, y: 6.62, h: FL - 0.03, yaw: Math.PI, yawT: Math.PI, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, amp: 0, room: '' });
+      Object.assign(fr, { x: 3.54, y: 6.62, h: FL - 0.03, yaw: Math.PI, yawT: Math.PI, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, amp: 0, room: '', blinkAt: 0, blinkEnd: 0 });
       setRoof(true); roofBtn.setAttribute('aria-pressed', 'true');
       doorLimits();
       DOORS.forEach(d => { d.th = d.w = d.hold = d.pull = 0; d.leaf.rotation.y = d.rot0; });
       fr.fly = reduceMotion ? null : { p0: camera.position.clone(), t0: controls.target.clone(), start: performance.now() };
-      francoFov();
+      playFov();
       canvas.focus({ preventScroll: true });
     } else {
+      kid.root.visible = false;
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
       camera.fov = 42; camera.updateProjectionMatrix();
     }
   }
-  $('#v-franco').addEventListener('click', () => setFranco(true));
+  // El botón Jugar abre el submenú para escoger con quién; se cierra al escoger, al tocar afuera o con Esc
+  const showMenu = on => { playMenu.hidden = !on; playBtn.setAttribute('aria-expanded', String(on)); };
+  playBtn.addEventListener('click', () => showMenu(playMenu.hidden));
+  playMenu.querySelectorAll('[data-kid]').forEach(b => b.addEventListener('click', () => { showMenu(false); setGame(true, b.dataset.kid); }));
+  document.addEventListener('pointerdown', e => { if (!playMenu.hidden && !e.target.closest('#play')) showMenu(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !playMenu.hidden) { showMenu(false); playBtn.focus(); } });
+  swapBtn.addEventListener('click', () => setKid(fr.who === 'franco' ? 'alayna' : 'franco'));
   $('#fh-exit').addEventListener('click', () => setView(fr.prev));
   roofBtn.addEventListener('click', () => { setRoof(!state.roof); roofBtn.setAttribute('aria-pressed', String(state.roof)); });
 
@@ -2499,7 +2857,7 @@
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-    if (fr.on) francoFov();
+    if (fr.on) playFov();
   }
   window.addEventListener('resize', resize);
   resize();
@@ -2574,7 +2932,7 @@
   let lastNow = performance.now();
   function loop(now) {
     const dt = Math.min(0.05, Math.max(0, (now - lastNow) / 1000)); lastNow = now;
-    if (fr.on) francoStep(dt, now);                          // en el modo Franco la cámara la lleva él, no OrbitControls
+    if (fr.on) playStep(dt, now);                            // en el juego la cámara sigue al niño, no OrbitControls
     else {
       if (tween) {
         let k = Math.min(1, (now - tween.start) / tween.dur);
