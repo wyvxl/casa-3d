@@ -165,12 +165,16 @@
      Las vistas y las pestañas siempre se ven; el cuerpo solo aparece con una pestaña escogida (data-tab en .rail) */
   @media (max-width: 800px){
     .tb{top:0;left:0;right:0;width:auto;max-height:70%;border-width:0 0 1px}
-    .tb-head{display:flex;align-items:center;gap:10px;padding:9px 14px calc(9px + env(safe-area-inset-top,0px));border-bottom:0}
+    .tb-head{display:flex;align-items:center;gap:8px;padding:9px 10px calc(9px + env(safe-area-inset-top,0px));border-bottom:0}
     .tb.is-open .tb-head{border-bottom:1px solid var(--rule-strong)}
-    .tb h1{font-size:19px;margin:0;flex:1;min-width:0;letter-spacing:.04em}
+    .tb h1{font:700 15px/1 var(--display);margin:0;flex:1 1 auto;min-width:0;letter-spacing:.01em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .tb-head .eyebrow,.tb-sub{display:none}
-    .tb-more{display:flex;align-items:center;gap:9px;padding:6px 0 6px 8px;background:none;border:0;color:var(--ink);cursor:pointer}
-    .tb-more b{font:600 16px/1 var(--display);font-variant-numeric:tabular-nums}
+    .tb-more{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:28px;height:34px;padding:0;background:none;border:0;color:var(--ink);cursor:pointer}
+    .tb-more b{display:none}                                  /* el área se lee al abrir el cajetín */
+    /* Las cinco vistas van en la misma línea del nombre, para no gastar un renglón abajo */
+    .tb-head .views{flex:0 0 auto;border:0;box-shadow:none;background:none}
+    .tb-head .views button{flex:0 0 auto;padding:11px 4px;font-size:10px;letter-spacing:.02em;border-right:1px solid var(--rule)}
+    .tb-head .views button:last-child{border-right:0}
     .tb-grid,.tb .spaces{display:none}
     .tb.is-open .tb-grid{display:grid;border-bottom:0}
     .tb.is-open .tb-more .chev{transform:translateY(2px) rotate(-135deg)}
@@ -180,8 +184,6 @@
     .rail{top:auto;left:0;right:0;bottom:0;width:auto;gap:0;align-items:stretch;justify-content:flex-end;
       background:var(--paper);border-top:1px solid var(--rule-strong);box-shadow:var(--shadow);pointer-events:auto;
       padding-bottom:env(safe-area-inset-bottom,0px)}
-    .views{border:0;border-bottom:1px solid var(--rule);box-shadow:none}
-    .views button{flex:1;padding:12px 2px;font-size:12px;letter-spacing:.06em}
     .sheet-grip{display:block;padding:7px 0 5px;cursor:grab;touch-action:none}
     .sheet-grip span{display:block;width:44px;height:4px;margin:0 auto;border-radius:99px;background:var(--rule-strong)}
     .sheet-tabs{display:flex}
@@ -204,6 +206,7 @@
     .ctl-body .room-btn,.ctl-body .room-desc{padding-left:2px}
     .ctl-body .room-desc{padding-left:24px}
     .move-row label{letter-spacing:.1em}
+    .move .note{display:none}                                 /* no aporta en pantalla chica */
   }
   @media (prefers-reduced-motion: reduce){ .chev,.hint{transition:none} }
 </style>
@@ -241,7 +244,6 @@
   <nav class="views panel" aria-label="Vistas">
     <button type="button" id="v-exterior" data-view="exterior" aria-pressed="true">Exterior</button>
     <button type="button" id="v-frente" data-view="frente" aria-pressed="false">Frente</button>
-    <button type="button" id="v-interior" data-view="interior" aria-pressed="false">Interior</button>
     <button type="button" id="v-planta" data-view="planta" aria-pressed="false">Planta</button>
     <button type="button" id="v-lote" data-view="lote" aria-pressed="false">Lote</button>
   </nav>
@@ -1928,11 +1930,13 @@
   const VIEWS = {
     exterior: { p: [9.8, 5.4, 12.6], t: [0, 1.2, 0.4], roof: true },
     frente: { p: [0.4, 2.0, 12.8], t: [0, 1.6, 0], roof: true },
-    interior: { p: [6.2, 11.2, 8.8], t: [0, 0, 0.2], roof: false },
     planta: { p: [0, 17, 0.31], t: [0, 0, 0.3], roof: false, dims: true },   // el fondo queda arriba, como en el PDF
-    // Norte arriba, como el plano catastrado, con este lote y el vecino de la derecha. En pantalla ancha se corre al oeste
-    // para que los lotes queden fuera del panel de la izquierda
-    lote: { p: [siteMid[0] + SOUTH.x * 0.02, 56, siteMid[1] + SOUTH.z * 0.02], t: [siteMid[0], 0, siteMid[1]], roof: true, dims: true, pan: [-EAST.x * 4, -EAST.z * 4] },
+    /* La casa de frente y la calle abajo (pedido de la dueña, 2026-09-21): antes iba con el norte arriba, como el plano
+       catastrado, y se veía la casa por detrás. El corrimiento de 0.02 en +Z es lo que decide para dónde queda el arriba de
+       la pantalla cuando la cámara mira recto hacia abajo: con +Z arriba queda −Z, o sea el fondo del lote, igual que en la
+       vista Planta. El norte queda para abajo y la flecha del norte lo dice. En pantalla ancha se corre para que los lotes
+       no queden tapados por el panel de la izquierda */
+    lote: { p: [siteMid[0], 56, siteMid[1] + 0.02], t: [siteMid[0], 0, siteMid[1]], roof: true, dims: true, pan: [EAST.x * 4, EAST.z * 4] },
   };
   function viewPose(name) {
     const v = VIEWS[name], t = new V3(...v.t), p = new V3(...v.p), a = camera.aspect;
@@ -2002,9 +2006,11 @@
     tabs.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === t)));
   }
   function applyLayout() {
-    const m = mob.matches, paint = $('#paint-box'), move = $('#move-box');
+    const m = mob.matches, paint = $('#paint-box'), move = $('#move-box'), views = $('.views'), head = $('.tb-head');
     if (m && spacesBox.parentElement !== ctlBody) ctlBody.insertBefore(spacesBox, ctlBody.firstChild);
     if (!m && spacesBox.parentElement !== tb) tb.appendChild(spacesBox);
+    if (m && views.parentElement !== head) head.appendChild(views);       // en el teléfono, en la línea del nombre
+    if (!m && views.parentElement !== rail) rail.insertBefore(views, rail.firstChild);
     $('#controls').open = spacesBox.open = true;
     paint.open = move.open = m;                                  // en la hoja no llevan resumen: van siempre abiertos
     if (!m) { setTab(null); tb.classList.remove('is-open'); $('#tb-more').setAttribute('aria-expanded', 'false'); }
