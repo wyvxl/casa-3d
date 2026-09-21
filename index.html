@@ -249,8 +249,10 @@
           <input type="range" id="mv-front" min="-4" max="14" step="0.05" value="0">
           <div class="move-row"><label for="mv-side">Hacia la izquierda</label><output id="mv-side-out" for="mv-side">0.00 m</output></div>
           <input type="range" id="mv-side" min="0" max="5" step="0.05" value="0">
+          <div class="move-row"><label for="mv-turn">Girar</label><output id="mv-turn-out" for="mv-turn">0.0&deg;</output></div>
+          <input type="range" id="mv-turn" min="-45" max="45" step="0.5" value="0">
           <button type="button" class="btn" id="mv-reset">Volver al sitio original</button>
-          <p class="note">La casa se topa en las l&iacute;neas del lote, el corte del fondo y el muro del boquete.</p>
+          <p class="note">La casa se topa en las l&iacute;neas del lote, el corte del fondo y el muro del boquete. Gira sobre su centro, as&iacute; que pegada al vecino de la derecha casi no da vuelta: c&oacute;rrala primero hacia la izquierda.</p>
         </div>
       </details>
     </div>
@@ -1693,20 +1695,37 @@
     for (let i = labels.length - 1; i >= 0; i--) if (labels[i].grp === g) { labels[i].el.remove(); labels.splice(i, 1); }
     while (g.children.length) g.children.pop().geometry.dispose();
   };
-  // dx, dz: cuánto se corrió la casa en el mundo (cuadro Mover casa). El borde del lote no se mueve; la casa, sí
-  function houseDims(dx = 0, dz = 0) {
+  /* dx, dz: cuánto se corrió la casa en el mundo; ang: cuánto la giraron sobre su centro (cuadro Mover casa). El borde del lote no
+     se mueve; la casa, sí. Las líneas se siguen dibujando donde siempre —la de la derecha sobre la colindancia y la de la izquierda
+     medio metro afuera de la casa—, pero el extremo que toca la casa se saca de la pared ya girada, así que con ang = 0 dan los
+     mismos números de siempre */
+  function houseDims(dx = 0, dz = 0, ang = 0) {
     [hNow, hBoq, hLot].forEach(clearDims);
-    const xr = xrW + W / 2, xl = -0.5 + dx, yF = D + 0.08 + dz, yB = -0.06 + dz;
-    const [zBR, zFR] = zAt(xrW), [zBL, zFL] = zAt(X(xl));
-    dimLine(xr, yF, xr, zFR + D / 2, (zFR - Z(yF)).toFixed(2), hNow);
+    const co = Math.cos(ang), si = Math.sin(ang);
+    const hp = (x, y) => { const u = x - W / 2, v = y - D / 2; return [W / 2 + dx + u * co + v * si, D / 2 + dz - u * si + v * co]; };
+    const edgeY = (y, atX) => {                                              // dónde cruza una pared del frente o del fondo la vertical x = atX
+      const [x0, y0] = hp(0, y), [x1, y1] = hp(W, y);
+      return Math.abs(x1 - x0) < 1e-6 ? y0 : y0 + (atX - x0) / (x1 - x0) * (y1 - y0);
+    };
+    /* z donde la recta vertical x = at corta la recta de un lado del lote: el 1-2 (i = 0) es el frente contra la calle y el 3-4
+       (i = 2) el corte del fondo. Se alarga la recta si hace falta, porque con la casa corrida a la izquierda la vertical ya sale
+       del lote por el lado 2-3 y antes la medida se tomaba contra ese lado, que no es, y salía negativa */
+    const lotZ = (i, at) => {
+      const q = LOT[i], r = LOT[(i + 1) % 4];
+      return Math.abs(r[0] - q[0]) < 1e-9 ? q[1] : q[1] + (at - q[0]) / (r[0] - q[0]) * (r[1] - q[1]);
+    };
+    const xr = xrW + W / 2, xl = -0.5 + dx;
+    const zFR = lotZ(0, xrW), zBR = lotZ(2, xrW), zFL = lotZ(0, X(xl)), zBL = lotZ(2, X(xl));
+    const yFR = edgeY(D + 0.08, xr), yBR = edgeY(-0.06, xr), yFL = edgeY(D + 0.06, xl), yBL = edgeY(-0.06, xl);
+    dimLine(xr, yFR, xr, zFR + D / 2, (zFR - Z(yFR)).toFixed(2), hNow);
     const yWall = D + 0.08 + BOQ.gap;                                        // cara del muro del boquete del lado del patio (fija)
-    dimLine(xr, yF, xr, yWall, (Z(yWall) - Z(yF)).toFixed(2), hBoq);
+    dimLine(xr, yFR, xr, yWall, (Z(yWall) - Z(yFR)).toFixed(2), hBoq);
     dimLine(xr, yWall + BOQ.wall, xr, zFR + D / 2, (zFR - Z(yWall + BOQ.wall)).toFixed(2), hBoq);
-    dimLine(xr, yB, xr, zBR + D / 2, (Z(yB) - zBR).toFixed(2), hLot);
-    dimLine(xl, D + 0.06 + dz, xl, zFL + D / 2, (zFL - Z(D + 0.06 + dz)).toFixed(2), hLot);
-    dimLine(xl, yB, xl, zBL + D / 2, (Z(yB) - zBL).toFixed(2), hLot);
-    const [xL] = cross(1, dz), gap = X(-0.06 + dx) - xL;                     // al vecino de la izquierda, a media casa
-    dimLine(-0.06 + dx, D / 2 + dz, xL + W / 2, D / 2 + dz, gap.toFixed(2), hLot);
+    dimLine(xr, yBR, xr, zBR + D / 2, (Z(yBR) - zBR).toFixed(2), hLot);
+    dimLine(xl, yFL, xl, zFL + D / 2, (zFL - Z(yFL)).toFixed(2), hLot);
+    dimLine(xl, yBL, xl, zBL + D / 2, (Z(yBL) - zBL).toFixed(2), hLot);
+    const [mx, my] = hp(-0.06, D / 2), [xL] = cross(1, Z(my)), gap = X(mx) - xL;   // al vecino de la izquierda, a media casa
+    dimLine(mx, my, xL + W / 2, my, gap.toFixed(2), hLot);
     $('#lot-gap').innerHTML = `${gap.toFixed(2)}<small>m</small>`;
   }
   houseDims();
@@ -1750,47 +1769,53 @@
     if (v && !state.losa) setLosa(true);
   }
 
-  /* Mover la casa dentro del lote (cuadro Mover casa). Corre la casa, el techo, los muebles, sus medidas y la piedrilla del frente;
-     las gradas del patio a la losa se corren solo de lado. front: metros hacia el fondo, negativo hacia la calle; side: metros hacia
-     la izquierda, separándose del vecino de la derecha. La casa se topa donde el filo de afuera del techo llegaría a una línea del
-     lote o al corte del fondo, y por delante en el muro del boquete o, sin boquete, en el borde del talud */
-  const MOVE = { front: 0, side: 0 }, houseOff = new V3();
+  /* Mover la casa dentro del lote (cuadro Mover casa). Corre y gira la casa, el techo, los muebles, sus medidas y la piedrilla del
+     frente; las gradas del patio a la losa se corren solo de lado. front: metros hacia el fondo, negativo hacia la calle; side:
+     metros hacia la izquierda, separándose del vecino de la derecha; turn: radianes sobre el centro de la casa. La casa se topa
+     donde el filo de afuera del techo llegaría a una línea del lote o al corte del fondo, y por delante en el muro del boquete o,
+     sin boquete, en el borde del talud. houseYaw es el giro de hoy: lo necesitan las etiquetas y las vistas, que no cuelgan de
+     ningún grupo de la casa */
+  const MOVE = { front: 0, side: 0, turn: 0 }, houseOff = new V3(), UPY = new V3(0, 1, 0);
+  let houseYaw = 0;
+  const toHouse = v => v.applyAxisAngle(UPY, houseYaw).add(houseOff);         // un punto del modelo, donde quedó la casa
   const RX = W / 2 + OVS + 0.05, RZ = D / 2 + OVF;                            // medio ancho y medio fondo del filo del techo
   const moveVec = (f, s) => [bu[0] * f - bw[0] * s, bu[1] * f - bw[1] * s];
-  const fitsAt = (f, s) => {
-    const [dx, dz] = moveVec(f, s);
+  const fitsAt = (f, s, t) => {
+    const [dx, dz] = moveVec(f, s), c = Math.cos(t), sn = Math.sin(t);
     return [[-RX, -RZ], [RX, -RZ], [-RX, RZ], [RX, RZ]].every(([x, z]) => {
-      const px = x + dx, pz = z + dz;
+      const px = x * c + z * sn + dx, pz = -x * sn + z * c + dz;              // la esquina del techo, girada y corrida
       if (wOf(px, pz) > 0 || eOf(px, pz) > 0 || sBack(px, pz) > -0.2) return false;
       return state.boq ? vOf(px, pz) >= BOQ.depth + BOQ.wall : sIn(px, pz) >= GROUND.talud;
     });
   };
-  // Se acerca lo más que puede a (f, s) sin salirse, partiendo de donde está la casa (o del sitio original, si ahí ya no cabe)
-  function setMove(f, s) {
-    const a = fitsAt(MOVE.front, MOVE.side) ? [MOVE.front, MOVE.side] : [0, 0];
-    if (!fitsAt(f, s)) {
+  // Se acerca lo más que puede a (f, s, t) sin salirse, partiendo de donde está la casa (o del sitio original, si ahí ya no cabe)
+  function setMove(f, s, t) {
+    const a = fitsAt(MOVE.front, MOVE.side, MOVE.turn) ? [MOVE.front, MOVE.side, MOVE.turn] : [0, 0, 0];
+    if (!fitsAt(f, s, t)) {
       let lo = 0, hi = 1;
       for (let i = 0; i < 20; i++) {
         const k = (lo + hi) / 2;
-        if (fitsAt(a[0] + (f - a[0]) * k, a[1] + (s - a[1]) * k)) lo = k; else hi = k;
+        if (fitsAt(a[0] + (f - a[0]) * k, a[1] + (s - a[1]) * k, a[2] + (t - a[2]) * k)) lo = k; else hi = k;
       }
-      f = a[0] + (f - a[0]) * lo; s = a[1] + (s - a[1]) * lo;
+      f = a[0] + (f - a[0]) * lo; s = a[1] + (s - a[1]) * lo; t = a[2] + (t - a[2]) * lo;
     }
-    MOVE.front = f; MOVE.side = s;
-    const [dx, dz] = moveVec(f, s);
+    MOVE.front = f; MOVE.side = s; MOVE.turn = houseYaw = t;
+    const [dx, dz] = moveVec(f, s), deg = t * 180 / Math.PI;
     houseOff.set(dx, 0, dz);
-    [house, roof, furn, dims, frontPad].forEach(g => g.position.set(dx, 0, dz));
+    [house, roof, furn, dims, frontPad].forEach(g => { g.position.set(dx, 0, dz); g.rotation.y = t; });
     const sl = Math.max(0, Math.min(s, stepRoom));                            // las gradas de la losa, sin salirse de ella
     losaSteps.position.set(-bw[0] * sl, 0, -bw[1] * sl);
-    houseDims(dx, dz);
-    $('#mv-front').value = f; $('#mv-side').value = s;
+    houseDims(dx, dz, t);
+    $('#mv-front').value = f; $('#mv-side').value = s; $('#mv-turn').value = deg;
     $('#mv-front-out').textContent = `${f.toFixed(2)} m`;
     $('#mv-side-out').textContent = `${s.toFixed(2)} m`;
+    $('#mv-turn-out').textContent = `${deg.toFixed(1)}°`;
   }
-  function fitHouse() { setMove(MOVE.front, MOVE.side); }
-  $('#mv-front').addEventListener('input', e => setMove(parseFloat(e.target.value), MOVE.side));
-  $('#mv-side').addEventListener('input', e => setMove(MOVE.front, parseFloat(e.target.value)));
-  $('#mv-reset').addEventListener('click', () => setMove(0, 0));
+  function fitHouse() { setMove(MOVE.front, MOVE.side, MOVE.turn); }
+  $('#mv-front').addEventListener('input', e => setMove(parseFloat(e.target.value), MOVE.side, MOVE.turn));
+  $('#mv-side').addEventListener('input', e => setMove(MOVE.front, parseFloat(e.target.value), MOVE.turn));
+  $('#mv-turn').addEventListener('input', e => setMove(MOVE.front, MOVE.side, parseFloat(e.target.value) * Math.PI / 180));
+  $('#mv-reset').addEventListener('click', () => setMove(0, 0, 0));
   $('#t-roof').addEventListener('change', e => setRoof(e.target.checked));
   $('#t-furn').addEventListener('change', e => setFurn(e.target.checked));
   $('#t-names').addEventListener('change', e => setNames(e.target.checked));
@@ -1854,7 +1879,7 @@
     if (id && fly) {
       const r = ROOMS.find(q => q.id === id), [x0, x1, y0, y1] = r.rect;
       if (state.roof) setRoof(false);
-      const t = new V3(X((x0 + x1) / 2), FL, Z((y0 + y1) / 2)).add(houseOff);
+      const t = toHouse(new V3(X((x0 + x1) / 2), FL, Z((y0 + y1) / 2)));
       const off = new V3(3.2, 8.5, 6.2); if (camera.aspect < 1.25) off.multiplyScalar(Math.min(2.2, 1.25 / camera.aspect));
       flyTo(t.clone().add(off), t);
     }
@@ -1872,7 +1897,7 @@
   };
   function viewPose(name) {
     const v = VIEWS[name], t = new V3(...v.t), p = new V3(...v.p), a = camera.aspect;
-    if (name !== 'lote') { t.add(houseOff); p.add(houseOff); }               // las vistas de la casa la siguen si se movió
+    if (name !== 'lote') { toHouse(t); toHouse(p); }                        // las vistas de la casa la siguen si la movieron o la giraron
     if (a < 1.25) p.sub(t).multiplyScalar(Math.min(2.3, 1.25 / a)).add(t);
     if (window.innerWidth > 800) { const [dx, dz] = v.pan || [-1.2, 0]; p.x += dx; t.x += dx; p.z += dz; t.z += dz; }
     return { p, t };
@@ -1945,7 +1970,7 @@
     for (const L of labels) {
       const show = L.kind === 'room' ? (state.names && !state.roof) : shown(L.grp);
       // Las etiquetas de la casa y de sus medidas se corren con ella
-      if (show) { v.copy(L.pos); if (L.kind === 'room' || L.grp === dims) v.add(houseOff); v.project(camera); }
+      if (show) { v.copy(L.pos); if (L.kind === 'room' || L.grp === dims) toHouse(v); v.project(camera); }
       if (!show || v.z > 1) { if (!L.el.hidden) L.el.hidden = true; continue; }
       L.el.hidden = false;
       L.el.style.transform = `translate(${((v.x * .5 + .5) * w).toFixed(1)}px,${((-v.y * .5 + .5) * h).toFixed(1)}px) translate(-50%,-50%)`;
