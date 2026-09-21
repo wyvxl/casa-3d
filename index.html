@@ -2157,50 +2157,106 @@
   });
   const hairMat = () => std({ vertexColors: true, roughness: .7, metalness: .05 });
 
-  /* Cabeza: esfera de 0.10 m, un poco angosta, con la quijada y la nuca que se cierran hacia abajo. La cara va pintada en un
-     lienzo de 1024 × 512 que envuelve la esfera (el frente cae en u = 0.25); facePx pasa un punto de la cara, en metros, a
-     pixeles de ese lienzo, así las cejas, los cachetes y la boca quedan donde van los ojos de verdad */
-  function headGeo() {
-    const g = new THREE.SphereGeometry(0.1, 48, 32), p = g.attributes.position;
+  /* Cabeza: esfera de 0.10 m, un poco angosta, con la quijada y la nuca que se cierran hacia abajo y un bulto suave en cada
+     cachete (cheek, en metros: más grande si sonríe). La cara va pintada en un lienzo de 1024 × 512 que envuelve la esfera (el
+     frente cae en u = 0.25); facePx pasa un punto de la cara, en metros, a pixeles de ese lienzo, así las cejas, los cachetes y
+     la boca quedan donde van los ojos de verdad */
+  function headGeo(cheek) {
+    const g = new THREE.SphereGeometry(0.1, 64, 44), p = g.attributes.position, v = new V3();
     for (let i = 0; i < p.count; i++) {
       const d = Math.min(0, p.getY(i) / 0.1), z = p.getZ(i);
-      p.setXYZ(i, p.getX(i) * 0.95 * (1 - 0.2 * d * d), p.getY(i) * 1.05, z * (z < 0 ? 1 - 0.22 * d * d : 1 - 0.05 * d * d));
+      v.set(p.getX(i) * 0.95 * (1 - 0.2 * d * d), p.getY(i) * 1.05, z * (z < 0 ? 1 - 0.22 * d * d : 1 - 0.05 * d * d));
+      [-1, 1].forEach(s => {
+        const dx = v.x - s * 0.052, dy = v.y + 0.026, dz = v.z - 0.075, k = cheek * Math.exp(-(dx * dx + dy * dy + dz * dz) / 0.0008);
+        if (k > 1e-6) v.multiplyScalar(1 + k / v.length());
+      });
+      p.setXYZ(i, v.x, v.y, v.z);
     }
+    g.computeVertexNormals();                                   // para que los cachetes agarren luz; la costura queda bajo el pelo
     return g;
   }
   const facePx = (x, y) => {
     const xx = x / 0.95, yy = y / 1.05, z = Math.sqrt(Math.max(1e-6, 0.01 - xx * xx - yy * yy)), k = 1024 / 360 * 180 / Math.PI;
     return [256 + Math.atan2(xx, z) * k, 256 - Math.asin(Math.max(-1, Math.min(1, yy / 0.1))) * k];
   };
-  // Lo que es igual en las dos caras: la piel, los cachetes rosados y las narices
+  // Lo que es igual en las dos caras: la piel, la cuenca de los ojos apenas más oscura, el párpado de abajo, los cachetes
+  // rosados, la sombra a los lados de la nariz, el surco sobre el labio y la sombra hacia la barbilla. draw recibe el lienzo
+  // y soft, que pinta una mancha suave
   function faceTex(skin, blush, draw) {
     const t = tex(1024, 512, g => {
       g.fillStyle = skin; g.fillRect(0, 0, 1024, 512);
+      const soft = (x, y, r, c) => {
+        const gr = g.createRadialGradient(x, y, 1, x, y, r); gr.addColorStop(0, c); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+      };
       [-1, 1].forEach(s => {
-        const [x, y] = facePx(s * 0.056, -0.022), gr = g.createRadialGradient(x, y, 2, x, y, 34);
-        gr.addColorStop(0, blush); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - 40, y - 40, 80, 80);
-        const [nx, ny] = facePx(s * 0.0065, -0.027); g.fillStyle = 'rgba(90,40,30,.45)';
-        g.beginPath(); g.ellipse(nx, ny, 2.6, 1.8, 0, 0, Math.PI * 2); g.fill();
+        const [ex, ey] = facePx(s * 0.034, 0.012);
+        soft(ex, ey - 6, 52, 'rgba(110,55,40,.14)');
+        g.strokeStyle = 'rgba(150,80,65,.38)'; g.lineWidth = 2.2;
+        g.beginPath(); g.ellipse(ex, ey + 1, 31, 23, 0, 0.18 * Math.PI, 0.82 * Math.PI); g.stroke();
+        const [bx, by] = facePx(s * 0.056, -0.024); soft(bx, by, 38, blush);
+        const [nx, ny] = facePx(s * 0.013, -0.013); soft(nx, ny, 15, 'rgba(110,55,40,.1)');
       });
-      draw(g);
+      const [px, py] = facePx(0, -0.035); soft(px, py, 10, 'rgba(110,55,40,.09)');
+      const [cx, cy] = facePx(0, -0.072); soft(cx, cy, 30, 'rgba(110,55,40,.08)');
+      draw(g, soft);
     });
     t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
   }
-  // Ojo: blanco, iris, pupila y brillo, con el párpado de arriba (pestañas) encima. Se cierra al parpadear (scale.y)
-  const eyeWhite = kidMat(0xF7F5F2, { roughness: .35 }), pupilM = kidMat(0x0E0B0A, { roughness: .2 }), glintM = std({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: .6 });
-  function kidEye(head, s, irisC, lashC, lashW, lashes) {
+  // Ceja de pelitos: trazos cortos a lo largo de un arco, más gruesa adentro y afinándose hacia la sien. x, y: el centro en la
+  // cara (s = −1 derecha, +1 izquierda); w y arch en pixeles
+  function brow(g, s, x, y, w, arch, color, thick, seed) {
+    const [cx, cy] = facePx(s * x, y), r = rng(seed + (s > 0 ? 1 : 0));
+    g.strokeStyle = color; g.lineCap = 'round';
+    for (let i = 0; i < 90; i++) {
+      const k = r(), px = cx + s * (k - 0.45) * w, py = cy - Math.sin(Math.min(1, k * 1.15) * Math.PI * 0.95) * arch + (1 - k) * 3;
+      const ang = s > 0 ? -0.3 - k * 0.45 : Math.PI + 0.3 + k * 0.45, len = 5 + r() * 5;
+      g.globalAlpha = 0.3 + r() * 0.45; g.lineWidth = thick * (1.25 - k * 0.8);
+      g.beginPath(); g.moveTo(px, py + (r() - 0.5) * thick); g.lineTo(px + Math.cos(ang) * len, py + Math.sin(ang) * len * 0.55); g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+  // Iris pintado: anillo oscuro por fuera, rayitas, más claro junto a la pupila y la pupila. Se proyecta de frente sobre la
+  // esfera del iris (uv plano), así el círculo del lienzo cae redondo en el ojo
+  function irisTex(hex) {
+    const c = new THREE.Color(hex), sty = k => { const x = c.clone().multiplyScalar(k); return `rgb(${[x.r, x.g, x.b].map(v => Math.round(Math.min(1, v) * 255)).join(',')})`; };
+    return tex(128, 128, (g, w, h, r) => {
+      const gr = g.createRadialGradient(64, 64, 18, 64, 64, 64);
+      gr.addColorStop(0, sty(1.9)); gr.addColorStop(0.45, sty(1.25)); gr.addColorStop(0.8, sty(0.85)); gr.addColorStop(0.93, sty(0.45)); gr.addColorStop(1, '#0c0806');
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+      for (let i = 0; i < 110; i++) {
+        const a = r() * Math.PI * 2, r0 = 24 + r() * 8, r1 = 44 + r() * 16;
+        g.strokeStyle = r() < 0.5 ? 'rgba(255,225,170,.16)' : 'rgba(0,0,0,.2)'; g.lineWidth = 0.8 + r() * 1.2;
+        g.beginPath(); g.moveTo(64 + Math.cos(a) * r0, 64 + Math.sin(a) * r0); g.lineTo(64 + Math.cos(a) * r1, 64 + Math.sin(a) * r1); g.stroke();
+      }
+      g.fillStyle = '#060404'; g.beginPath(); g.arc(64, 64, 25, 0, Math.PI * 2); g.fill();
+    }, 90);
+  }
+  /* Ojo: bola blanca, iris con su textura, dos brillos y el párpado de arriba, que es un casquete de piel con la línea de las
+     pestañas en el borde (y, si lashes, pestañas largas hacia la esquina de afuera). o: iris, skinM, lash (color), lashW,
+     lashes, open (cuánto se echa atrás el párpado, en rad). Al parpadear el párpado baja 2 rad y tapa el ojo */
+  const eyeWhite = kidMat(0xF7F5F2, { roughness: .3 }), glintM = std({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: .7 });
+  function kidEye(head, s, o) {
     const g = new THREE.Group(); g.position.set(s * 0.034, 0.012, 0.086); g.rotation.y = s * 0.33; head.add(g);
-    kidPart(new THREE.SphereGeometry(0.0165, 18, 12), eyeWhite, 0, 0, 0, g).scale.set(1.15, 0.85, 0.55);
-    kidPart(new THREE.SphereGeometry(0.0105, 18, 12), kidMat(irisC, { roughness: .3 }), 0, -0.0005, 0.0066, g).scale.set(1, 1, 0.45);
-    kidPart(new THREE.SphereGeometry(0.0055, 12, 8), pupilM, 0, -0.0005, 0.0099, g).scale.set(1, 1, 0.4);
-    kidPart(new THREE.SphereGeometry(0.0022, 8, 6), glintM, -0.003, 0.0035, 0.0118, g);
-    const lashM = kidMat(lashC, { roughness: .6 });
-    kidPart(new THREE.TorusGeometry(0.0172, lashW, 6, 20, Math.PI), lashM, 0, -0.001, 0.0045, g).scale.set(1.14, 0.9, 1);
-    if (lashes) [0.35, 0.18, 0.02].forEach((a, i) => {                  // pestañas largas hacia la esquina de afuera
-      const l = kidPart(new THREE.BoxGeometry(0.0015, 0.0065, 0.0012), lashM, s * Math.cos(a) * 0.0195, Math.sin(a) * 0.016 + 0.002, 0.006, g);
-      l.rotation.z = -s * (0.9 - i * 0.25);
+    const ball = new THREE.Group(); ball.scale.set(1.15, 0.85, 0.6); g.add(ball);
+    kidPart(new THREE.SphereGeometry(0.0165, 24, 16), eyeWhite, 0, 0, 0, ball);
+    const ig = new THREE.SphereGeometry(0.0105, 24, 16), uv = ig.attributes.uv, ip = ig.attributes.position;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5 + ip.getX(i) / 0.021, 0.5 + ip.getY(i) / 0.021);
+    kidPart(ig, std({ map: irisTex(o.iris), roughness: .2 }), 0, -0.0006, 0.0068, g).scale.set(1, 1, 0.42);
+    kidPart(new THREE.SphereGeometry(0.0021, 8, 6), glintM, -0.0032, 0.0036, 0.0116, g);
+    kidPart(new THREE.SphereGeometry(0.0011, 6, 5), glintM, 0.0033, -0.003, 0.0113, g);
+    // El párpado va un poco más abombado que la bola, así al cerrar tapa también el iris y los brillos, que sobresalen
+    const lidG = new THREE.Group(); lidG.scale.set(1.18, 0.88, 0.82); g.add(lidG);
+    const lid = new THREE.Group(); lid.rotation.x = o.open; lidG.add(lid);
+    const cap = 1.12, R = 0.0176, er = R * Math.sin(cap), ey = R * Math.cos(cap), lashM = kidMat(o.lash, { roughness: .6 });
+    kidPart(new THREE.SphereGeometry(R, 28, 8, 0, Math.PI * 2, 0, cap), o.skinM, 0, 0, 0, lid);
+    kidPart(new THREE.TorusGeometry(er, o.lashW, 6, 32, Math.PI), lashM, 0, ey, 0, lid).rotation.x = Math.PI / 2;
+    if (o.lashes) [0.18, 0.42, 0.68, 0.95].forEach((a, i) => {
+      const aa = s > 0 ? a : Math.PI - a, dir = new V3(Math.cos(aa), 0.9, Math.sin(aa) * 0.6).normalize();
+      const l = kidPart(new THREE.BoxGeometry(0.0011, 0.0068 - i * 0.0009, 0.0008).translate(0, 0.0034 - i * 0.00045, 0), lashM, er * Math.cos(aa), ey, er * Math.sin(aa), lid);
+      l.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir);
     });
-    return g;
+    return { lid, open: o.open };
   }
   function kidRig(name, skin, scale) {
     const root = new THREE.Group(); root.visible = false; root.scale.setScalar(scale); house.add(root);
@@ -2229,7 +2285,14 @@
       const ft = new THREE.Group(); ft.position.y = -0.235; kn.add(ft); feet.push(ft);
     });
     kidPart(new THREE.CylinderGeometry(0.037, 0.041, 0.09, 16), skinM, 0, 0.87, 0, body);                     // cuello
-    kidPart(new THREE.SphereGeometry(0.012, 12, 10), skinM, 0, -0.016, 0.097, head).scale.set(1, 0.9, 0.85);   // nariz
+    // Nariz de niño: puente bajito, punta redonda, aletas y las ventanas oscuras por debajo
+    kidPart(new THREE.SphereGeometry(0.008, 12, 10), skinM, 0, -0.003, 0.094, head).scale.set(0.85, 1.9, 0.6);
+    kidPart(new THREE.SphereGeometry(0.0098, 16, 12), skinM, 0, -0.018, 0.0955, head).scale.set(1.05, 0.85, 0.8);
+    const nostrilM = kidMat(0x5A2A20, { roughness: .9 });
+    [-1, 1].forEach(s => {
+      kidPart(new THREE.SphereGeometry(0.006, 10, 8), skinM, s * 0.0085, -0.021, 0.0895, head);
+      kidPart(new THREE.SphereGeometry(0.0021, 8, 6), nostrilM, s * 0.0048, -0.0262, 0.094, head).scale.set(1.3, 0.6, 0.8);
+    });
     [-1, 1].forEach(s => kidPart(new THREE.SphereGeometry(0.022, 12, 10), skinM, s * 0.093, -0.008, -0.004, head).scale.set(0.45, 1, 0.7));   // orejas
     return { name, root, body, head, arms, elbows, legs, knees, feet, skinM, eyes: [] };
   }
@@ -2272,18 +2335,23 @@
   const franco = kidRig('Franco', 0xECC3A4, 1);
   {
     const { body, head, arms, legs, feet } = franco;
-    kidPart(headGeo(), std({ map: faceTex('#ECC3A4', 'rgba(232,120,110,.42)', g => {
-      [-1, 1].forEach(s => {                                            // cejas finas, castaño claro
-        const [x, y] = facePx(s * 0.036, 0.043); g.strokeStyle = '#8A5A3B'; g.lineWidth = 5; g.lineCap = 'round';
-        g.beginPath(); g.moveTo(x - s * 20, y + 5); g.quadraticCurveTo(x, y - 6, x + s * 22, y + 2); g.stroke();
-      });
-      const [mx, my] = facePx(0, -0.046);                               // boca pequeña, un poco abierta, como en las fotos
-      g.fillStyle = '#7A3430'; g.beginPath(); g.ellipse(mx, my + 1, 12, 5, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#D98C83'; g.beginPath(); g.moveTo(mx - 26, my); g.quadraticCurveTo(mx - 10, my - 9, mx, my - 5); g.quadraticCurveTo(mx + 10, my - 9, mx + 26, my);
-      g.quadraticCurveTo(mx + 12, my - 2, mx, my - 2); g.quadraticCurveTo(mx - 12, my - 2, mx - 26, my); g.fill();
-      g.beginPath(); g.moveTo(mx - 22, my + 2); g.quadraticCurveTo(mx, my + 17, mx + 22, my + 2); g.quadraticCurveTo(mx, my + 7, mx - 22, my + 2); g.fill();
+    kidPart(headGeo(0.005), std({ map: faceTex('#ECC3A4', 'rgba(232,120,110,.42)', (g, soft) => {
+      [-1, 1].forEach(s => brow(g, s, 0.036, 0.043, 44, 7, '#8A5A3B', 3.2, 21));   // cejas finas, castaño claro
+      // Boca pequeña y entreabierta, como en las fotos: se asoman los dientes de arriba; labio de arriba con el arco de
+      // cupido, el de abajo más lleno y con brillo, y las comisuras
+      const [mx, my] = facePx(0, -0.046);
+      soft(mx, my + 15, 22, 'rgba(120,50,45,.12)');
+      g.fillStyle = '#6E2C29'; g.beginPath(); g.ellipse(mx, my + 1, 10, 4, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#F2EEE8'; g.fillRect(mx - 7, my - 2, 14, 2.6);
+      g.fillStyle = '#C97A70'; g.beginPath(); g.moveTo(mx - 25, my + 1); g.quadraticCurveTo(mx - 14, my - 7, mx - 4, my - 6);
+      g.quadraticCurveTo(mx, my - 3, mx + 4, my - 6); g.quadraticCurveTo(mx + 14, my - 7, mx + 25, my + 1);
+      g.quadraticCurveTo(mx + 10, my - 1.5, mx, my - 1); g.quadraticCurveTo(mx - 10, my - 1.5, mx - 25, my + 1); g.fill();
+      const lg = g.createLinearGradient(0, my + 2, 0, my + 14); lg.addColorStop(0, '#CF8278'); lg.addColorStop(1, '#DE978C');
+      g.fillStyle = lg; g.beginPath(); g.moveTo(mx - 21, my + 2); g.quadraticCurveTo(mx, my + 16, mx + 21, my + 2); g.quadraticCurveTo(mx, my + 5, mx - 21, my + 2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.28)'; g.beginPath(); g.ellipse(mx + 3, my + 8, 6, 1.8, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(110,40,35,.4)'; [-1, 1].forEach(s => { g.beginPath(); g.arc(mx + s * 25, my + 1, 1.8, 0, Math.PI * 2); g.fill(); });
     }), roughness: .6 }), 0, 0, 0, head);
-    franco.eyes = [-1, 1].map(s => kidEye(head, s, 0x6B4428, 0x3A2419, 0.0017, false));
+    franco.eyes = [-1, 1].map(s => kidEye(head, s, { iris: 0x6B4428, skinM: franco.skinM, lash: 0x3A2419, lashW: 0.0011, lashes: false, open: -0.56 }));
     // Camiseta: tronco con forma de niño (pancita incluida), costuras a los lados, ruedo pespunteado y la carita del pecho.
     // Se gira media vuelta para que el centro del lienzo quede adelante; un poco a la derecha del centro es la izquierda de él
     const shirtTex = tex(512, 256, (g, w, h, r) => {
@@ -2360,25 +2428,32 @@
   const alayna = kidRig('Alayna', 0xD8A07A, 1.02);
   {
     const { body, head, arms, feet } = alayna;
-    kidPart(headGeo(), std({ map: faceTex('#D8A07A', 'rgba(214,100,96,.38)', g => {
-      [-1, 1].forEach(s => {                                            // cejas oscuras y arqueadas
-        const [x, y] = facePx(s * 0.036, 0.044); g.strokeStyle = '#2A1810'; g.lineWidth = 6.5; g.lineCap = 'round';
-        g.beginPath(); g.moveTo(x - s * 22, y + 7); g.quadraticCurveTo(x - s * 2, y - 8, x + s * 24, y + 1); g.stroke();
+    kidPart(headGeo(0.0068), std({ map: faceTex('#D8A07A', 'rgba(214,100,96,.4)', (g, soft) => {
+      [-1, 1].forEach(s => {
+        brow(g, s, 0.036, 0.045, 48, 9, '#24150E', 4.2, 31);           // cejas oscuras y arqueadas
         const [dx, dy] = facePx(s * 0.047, -0.05); g.strokeStyle = 'rgba(120,55,40,.35)'; g.lineWidth = 2.5;   // hoyuelos
         g.beginPath(); g.arc(dx, dy, 5, s > 0 ? 2.2 : -0.3, s > 0 ? 3.4 : 0.9); g.stroke();
       });
-      const [mx, my] = facePx(0, -0.047);                               // sonrisa grande con los dientes de arriba
-      g.fillStyle = '#5E1F1F'; g.beginPath(); g.moveTo(mx - 38, my - 6); g.quadraticCurveTo(mx, my + 2, mx + 38, my - 6);
-      g.quadraticCurveTo(mx + 26, my + 26, mx, my + 27); g.quadraticCurveTo(mx - 26, my + 26, mx - 38, my - 6); g.fill();
-      g.save(); g.clip();
+      // Sonrisa grande: los dientes de arriba, la lengua al fondo, el labio de arriba con el arco de cupido y el de abajo lleno
+      const [mx, my] = facePx(0, -0.047);
+      soft(mx, my + 30, 26, 'rgba(120,50,45,.12)');
+      const mouth = () => { g.beginPath(); g.moveTo(mx - 38, my - 6); g.quadraticCurveTo(mx, my + 2, mx + 38, my - 6);
+        g.quadraticCurveTo(mx + 26, my + 26, mx, my + 27); g.quadraticCurveTo(mx - 26, my + 26, mx - 38, my - 6); };
+      g.fillStyle = '#5E1F1F'; mouth(); g.fill();
+      g.save(); mouth(); g.clip();
       g.fillStyle = '#FBF8F2'; g.fillRect(mx - 40, my - 8, 80, 16);
+      g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(mx - 40, my + 5, 80, 3);
       g.strokeStyle = 'rgba(160,150,140,.5)'; g.lineWidth = 1; [-18, -6, 6, 18].forEach(d => { g.beginPath(); g.moveTo(mx + d, my - 6); g.lineTo(mx + d, my + 7); g.stroke(); });
       g.fillStyle = '#C0615C'; g.beginPath(); g.ellipse(mx, my + 23, 16, 7, 0, 0, Math.PI * 2); g.fill();
       g.restore();
-      g.strokeStyle = '#B0544E'; g.lineWidth = 4; g.beginPath(); g.moveTo(mx - 38, my - 6); g.quadraticCurveTo(mx, my + 2, mx + 38, my - 6);
-      g.quadraticCurveTo(mx + 26, my + 26, mx, my + 27); g.quadraticCurveTo(mx - 26, my + 26, mx - 38, my - 6); g.stroke();
+      g.fillStyle = '#B45B55'; g.beginPath(); g.moveTo(mx - 39, my - 6); g.quadraticCurveTo(mx - 18, my - 15, mx - 5, my - 12);
+      g.quadraticCurveTo(mx, my - 9, mx + 5, my - 12); g.quadraticCurveTo(mx + 18, my - 15, mx + 39, my - 6); g.quadraticCurveTo(mx, my + 2, mx - 39, my - 6); g.fill();
+      const lg = g.createLinearGradient(0, my + 20, 0, my + 36); lg.addColorStop(0, '#B8625B'); lg.addColorStop(1, '#C97770');
+      g.fillStyle = lg; g.beginPath(); g.moveTo(mx - 26, my + 20); g.quadraticCurveTo(mx, my + 38, mx + 26, my + 20); g.quadraticCurveTo(mx, my + 29, mx - 26, my + 20); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.ellipse(mx + 4, my + 31, 7, 2, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(110,45,40,.45)'; g.lineWidth = 2; [-1, 1].forEach(s => { g.beginPath(); g.arc(mx + s * 41, my - 9, 5, s > 0 ? 1.9 : 0.2, s > 0 ? 2.9 : 1.2); g.stroke(); });
     }), roughness: .6 }), 0, 0, 0, head);
-    alayna.eyes = [-1, 1].map(s => kidEye(head, s, 0x2E1B10, 0x120B08, 0.0026, true));
+    alayna.eyes = [-1, 1].map(s => kidEye(head, s, { iris: 0x2E1B10, skinM: alayna.skinM, lash: 0x120B08, lashW: 0.0016, lashes: true, open: -0.58 }));
     // Cuadritos: franjas celestes a lo largo y a lo ancho, más oscuras donde se cruzan. En el pecho, además, el fruncido
     // (líneas de elástico cada 1.2 cm, con su sombrita)
     const gingham = (rx, ry, smock) => {
@@ -2788,8 +2863,9 @@
     kid.body.rotation.x = 0.06 * A; kid.body.rotation.y = sn * 0.07 * A;
     kid.head.rotation.y = Math.sin(t * 0.7) * 0.3 * still - kid.body.rotation.y;
     kid.head.rotation.x = Math.sin(t * 0.43) * 0.06 * still;
-    if (t > fr.blinkAt) { fr.blinkEnd = t + 0.12; fr.blinkAt = t + 2 + Math.random() * 3; }
-    kid.eyes.forEach(e => { e.scale.y = t < fr.blinkEnd ? 0.1 : 1; });
+    if (t > fr.blinkAt) { fr.blinkEnd = t + 0.16; fr.blinkAt = t + 2 + Math.random() * 3; }
+    const blink = t < fr.blinkEnd ? 1 - Math.abs((fr.blinkEnd - t) / 0.08 - 1) : 0;   // baja y sube el párpado
+    kid.eyes.forEach(e => { e.lid.rotation.x = e.open + 2.0 * blink; });
     if (kid.skirt) { kid.skirt.rotation.x = -0.05 * A + Math.sin(ph * 2) * 0.025 * A; kid.skirt.rotation.z = sn * 0.03 * A; }
     if (kid.hair) kid.hair.rotation.x = 0.06 * A + Math.sin(ph * 2) * 0.012 * A;
     fr.h += (floorAt(fr.x, fr.y) - fr.h) * Math.min(1, dt * 14);
