@@ -204,6 +204,13 @@
   .stick.is-on{cursor:grabbing}
   .stick.is-on .knob{background:var(--accent)}
   .stick-lbl{position:absolute;left:50%;bottom:100%;transform:translate(-50%,-8px);padding:4px 7px 3px;background:var(--paper);border:1px solid var(--rule);font:600 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);white-space:nowrap;pointer-events:none}
+  .acts{position:absolute;right:calc(24px + env(safe-area-inset-right,0px));bottom:calc(190px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+  .act-row{display:flex;align-items:center;gap:8px}
+  .act{width:58px;height:58px;padding:0;border-radius:50%;border:1px solid var(--rule-strong);background:var(--glass);color:var(--ink);box-shadow:var(--shadow);
+    font:700 12px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+  .act:active{background:var(--accent);color:var(--paper)}
+  .act-main{width:68px;height:68px;background:var(--ink);color:var(--paper);font-size:13px}
+  .act-ctx{width:auto;height:46px;padding:0 20px;border-radius:23px;background:var(--accent);color:var(--paper);border-color:var(--accent);font-size:14px;letter-spacing:.08em}
   .fh-keys{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);margin:0;padding:7px 12px;background:var(--paper);border:1px solid var(--rule);color:var(--ink-2);font-size:12.5px;white-space:nowrap;pointer-events:none}
   @media (hover: none), (max-width: 1100px){ .fh-keys{display:none} }
 
@@ -264,6 +271,9 @@
     .stick{width:124px;height:124px;bottom:calc(22px + env(safe-area-inset-bottom,0px))}
     .stick-move{left:calc(18px + env(safe-area-inset-left,0px))}
     .stick-look{right:calc(18px + env(safe-area-inset-right,0px))}
+    .acts{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(166px + env(safe-area-inset-bottom,0px))}
+    .act{width:52px;height:52px;font-size:11px}
+    .act-main{width:60px;height:60px}
   }
   @media (prefers-reduced-motion: reduce){ .chev,.hint{transition:none} }
 </style>
@@ -375,7 +385,15 @@
   </div>
   <div class="stick stick-move" id="stick-move" role="img" aria-label="Joystick para caminar"><span class="stick-lbl">Caminar</span><i class="knob"></i></div>
   <div class="stick stick-look" id="stick-look" role="img" aria-label="Joystick para mirar"><span class="stick-lbl">Mirar</span><i class="knob"></i></div>
-  <p class="fh-keys">W A S D o flechas para caminar · Shift para correr · arrastra para mirar · M para la música · Esc para salir</p>
+  <div class="acts">
+    <button type="button" class="act act-ctx" id="act-ctx" hidden></button>
+    <div class="act-row">
+      <button type="button" class="act" id="act-ball" title="Traer la pelota (P)">Pelota</button>
+      <button type="button" class="act" id="act-wave" title="Saludar (Q)">Hola</button>
+      <button type="button" class="act act-main" id="act-jump" title="Saltar (espacio)">Saltar</button>
+    </div>
+  </div>
+  <p class="fh-keys">WASD o flechas: caminar · Shift: correr · Espacio: saltar · Q: saludar · E: usar · P: pelota · M: sonido · Esc: salir</p>
 </div>
 <div class="fallback" id="fallback" hidden><p>No se pudo iniciar el visor 3D. Abre la página en un navegador con WebGL activado (Chrome, Edge, Firefox o Safari recientes).</p></div>
 
@@ -808,8 +826,8 @@
   const roomLights = [];
   [[1.5, 1.25, 1.0], [1.5, 5.5, 1.0], [0.98, 3.25, 0.6], [4.44, 1.5, 0.9], [4.44, 4.4, 0.9], [4.45, 6.5, 0.8], [3.54, -0.3, 0.6]].forEach(([x, y, max]) => {
     const L = new THREE.PointLight(0xffc98a, 0, 5.5, 1.6);
-    L.position.set(X(x), FL + CEIL - 0.25, Z(y)); L.userData.max = max; scene.add(L); roomLights.push(L);
-    const fx = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 16), M.bulb);
+    L.position.set(X(x), FL + CEIL - 0.25, Z(y)); L.userData.max = max; house.add(L); roomLights.push(L);   // siguen a la casa
+    const fx = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 16), M.bulb.clone()); L.userData.fx = fx;   // plafón propio
     fx.position.set(X(x), FL + CEIL - 0.015, Z(y)); roof.add(fx);
   });
 
@@ -935,7 +953,24 @@
   fbox(5.3, 5.78, 1.0, 1.55, 0.9, 0.91, COL.black);
   [[5.42, 1.14], [5.66, 1.14], [5.42, 1.4], [5.66, 1.4]].forEach(([x, y]) => fcyl(x, y, 0.07, 0.91, 0.92, COL.burner));
   fbox(5.5, W - 0.04, 0.66, 1.85, 1.5, 2.2, COL.cab);
-  fbox(5.18, 5.81, 1.93, 2.58, 0, 1.75, COL.steel); fbox(5.14, 5.18, 2.46, 2.5, 0.9, 1.5, COL.black);
+  // Refri hueca: casco, adentro blanco (se ilumina al abrir) con tres repisas de vidrio y comida, y la puerta con su jaladera en
+  // una bisagra del lado del fondo, para que en el juego se pueda abrir (FRIDGE)
+  fbox(5.21, 5.81, 1.93, 1.96, 0, 1.75, COL.steel); fbox(5.21, 5.81, 2.55, 2.58, 0, 1.75, COL.steel);        // costados
+  fbox(5.78, 5.81, 1.96, 2.55, 0, 1.75, COL.steel); fbox(5.21, 5.81, 1.96, 2.55, 1.71, 1.75, COL.steel);     // fondo y techo
+  fbox(5.21, 5.81, 1.96, 2.55, 0, 0.08, COL.steel);
+  const fridgeIn = std({ color: 0xF4F6F7, roughness: .4, emissive: 0xEAF4FF, emissiveIntensity: 0 });
+  fbox(5.765, 5.78, 1.96, 2.55, 0.08, 1.71, fridgeIn); fbox(5.22, 5.78, 1.96, 1.968, 0.08, 1.71, fridgeIn); fbox(5.22, 5.78, 2.542, 2.55, 0.08, 1.71, fridgeIn);
+  [0.5, 0.95, 1.35].forEach(z => fbox(5.23, 5.76, 1.97, 2.54, z, z + 0.012, M.clearGlass));
+  fbox(5.5, 5.58, 2.0, 2.08, 0.512, 0.76, 0xF7F7F2); fbox(5.5, 5.58, 2.0, 2.08, 0.76, 0.78, 0x2E86C1);        // leche
+  fbox(5.45, 5.53, 2.3, 2.38, 0.512, 0.72, 0xF39C12);                                                       // jugo
+  [[5.4, 2.14], [5.47, 2.2], [5.38, 2.25]].forEach(([x, y]) => fcyl(x, y, 0.035, 0.962, 1.03, 0xC0392B, 0.03));   // manzanas
+  fbox(5.35, 5.5, 2.35, 2.5, 0.962, 1.0, 0xF4D03F);                                                         // queso
+  fbox(5.3, 5.62, 2.05, 2.45, 1.362, 1.4, 0xE8E0D0);                                                        // cartón de huevos
+  const fridgeDoor = new THREE.Group(); fridgeDoor.position.set(X(5.195), FL, Z(1.93)); fp.add(fridgeDoor);
+  addBox(0.03, 1.75, 0.65, mat(COL.steel), 0, 0.875, 0.325, fridgeDoor);
+  addBox(0.04, 0.6, 0.04, mat(COL.black), -0.035, 1.2, 0.55, fridgeDoor);                                  // jaladera
+  const fridgeLight = new THREE.PointLight(0xEAF4FF, 0, 1.8, 2); fridgeLight.position.set(X(5.4), FL + 1.2, Z(2.25)); fp.add(fridgeLight);
+  const FRIDGE = { door: fridgeDoor, light: fridgeLight, inner: fridgeIn, open: 0, target: 0 };
   // Barra desayunadora a media sala: sale de la pared derecha después del refri y separa la cocina de la sala.
   // Mueble de cocina de 0.28 de fondo y sobre de 0.55 con vuelo de 0.25 hacia la sala para las rodillas.
   // Termina en x = 4.02, a plomo con las dos puertas, así queda libre el paso de 0.96 m entre las puertas y el pasillo
@@ -966,6 +1001,13 @@
   fcyl(5.87, -0.09, 0.02, -0.06, 0.97, COL.white);                          // tubo de la llave
   fbox(5.5, 5.89, -0.11, -0.07, 0.95, 0.99, COL.white);
   fcyl(5.5, -0.16, 0.015, 0.93, 0.99, COL.steel); fbox(5.49, 5.51, -0.16, -0.09, 0.97, 0.99, COL.steel);
+  // El chorro de la llave y el agua que se junta en la pila: en el juego se abren (TAP); si no, no se ven
+  const waterM = std({ color: 0x8EC9E8, roughness: .08, metalness: .1, transparent: true, opacity: .55, depthWrite: false });
+  const tapStream = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.01, 0.16, 8, 1, true), waterM);
+  tapStream.position.set(X(5.5), FL + 0.85, Z(-0.16)); tapStream.visible = false; house.add(tapStream);
+  const tapPool = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.46), waterM);
+  tapPool.rotation.x = -Math.PI / 2; tapPool.position.set(X(5.42), FL + 0.775, Z(-0.34)); tapPool.visible = false; house.add(tapPool);
+  const TAP = { stream: tapStream, pool: tapPool, open: false, level: 0, src: null };
   fbox(4.19, 4.27, -0.05, -0.04, 1.2, 1.32, COL.white);                     // apagador
 
   /* ---------- terreno ---------- */
@@ -1824,6 +1866,7 @@
     if (h < 6) return 'madrugada'; if (h >= 18.75) return 'noche'; if (h < 7) return 'amanecer';
     if (h < 11.5) return 'mañana'; if (h < 13.5) return 'mediodía'; if (h < 17.25) return 'tarde'; return 'atardecer';
   }
+  let lastHour = 10;
   function applyHour(h) {
     const t = (h - 6) / 12 * Math.PI, s = Math.sin(t);
     const day = smooth(-0.1, 0.28, s);
@@ -1843,7 +1886,12 @@
     M.frosted.emissiveIntensity = night * 0.8;
     nbGlass.emissiveIntensity = night * 0.55;
     M.bulb.emissiveIntensity = night * 1.6;
-    roomLights.forEach(L => { L.intensity = night * L.userData.max; });
+    // Cada luz sigue la hora, salvo que en el juego la hayan prendido o apagado en su apagador (userData.on)
+    roomLights.forEach(L => {
+      const k = L.userData.on == null ? night : L.userData.on ? 1 : 0;
+      L.intensity = k * L.userData.max; L.userData.fx.material.emissiveIntensity = k * 1.6;
+    });
+    lastHour = h;
     const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
     $('#hour-out').innerHTML = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}<span>${period(h)}</span>`;
   }
@@ -2656,7 +2704,7 @@
 
   const FR_R = 0.14;                                          // radio con que choca: los hombros de un niño de 5 años
   const LOOK_H = 1.15;                                        // la cámara mira un poco sobre su cabeza, para que él quede abajo
-  const fr = { on: false, who: 'franco', blinkAt: 0, blinkEnd: 0, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
+  const fr = { on: false, who: 'franco', blinkAt: 0, blinkEnd: 0, jz: 0, jv: 0, waveEnd: 0, speed: 0, pose: null, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
     wantX: 0, wantY: 0, prev: 'exterior', fly: null, room: '', look: new V3() };
   const clampPitch = p => Math.max(-0.12, Math.min(1.25, p));
   const inHouse = (x, y) => x >= -0.08 && x <= W + 0.08 && y >= -0.08 && y <= D + 0.08;
@@ -2681,9 +2729,9 @@
   // casa en fitsAt —colindancias, corte del fondo y talud o muro del boquete, salvo sobre la losa—, en los troncos y los
   // arbustos, en las jardineras de la orilla izquierda (capa Grada y plantas) y en los postes del techo de la losa. Que no
   // suba ni baje más de una grada lo cuida walkBy
-  function canStand(x, y) {
+  function canStand(x, y, r = FR_R) {
     if (inHouse(x, y)) return true;
-    const p = toHouse(fw.set(X(x), 0, Z(y))), r = FR_R;
+    const p = toHouse(fw.set(X(x), 0, Z(y)));
     if (wOf(p.x, p.z) > -r || sBack(p.x, p.z) > -0.2 - r) return false;
     if (eOf(p.x, p.z) > -(state.extra && !state.boq ? LEFT.edge + LEFT.bed + r : r)) return false;
     if (state.boq ? vOf(p.x, p.z) < BOQ.depth + BOQ.wall + r && losaFloor(x, y, p) === null : sIn(p.x, p.z) < GROUND.talud + r) return false;
@@ -2925,7 +2973,8 @@
   function playStep(dt, now) {
     // Lo que pide el jugador. Los ejes van en pantalla: x a la derecha, y hacia adelante
     let [mx, my] = radial(stickMove.x, -stickMove.y), lx = dead(stickLook.x), ly = dead(stickLook.y);
-    const pad = gamepad();
+    const pad = gamepad(), t = now / 1000;
+    padButtons(pad);
     if (pad) {
       const [gx, gy] = radial(pad.axes[0] || 0, -(pad.axes[1] || 0)); mx += gx; my += gy;
       lx += dead(pad.axes[2] || 0); ly += dead(pad.axes[3] || 0);
@@ -2935,11 +2984,12 @@
     my += key('KeyW', 'ArrowUp') - key('KeyS', 'ArrowDown');
     const run = key('ShiftLeft', 'ShiftRight'), mag = Math.min(1, Math.hypot(mx, my));
     fr.camYaw -= lx * 2.4 * dt; fr.pitch = clampPitch(fr.pitch + ly * 1.4 * dt);
+    if (fr.pose && mag > 0.35) endPose();                      // moverse lo levanta de la butaca o de la cama
 
     // Camina hacia donde mira la cámara: con el joystick a medias, despacio; hasta el fondo, 1.5 m/s; con Shift corre
     const x0 = fr.x, y0 = fr.y;
     fr.wantX = fr.wantY = 0;
-    if (mag > 0) {
+    if (mag > 0 && !fr.pose) {
       const n = Math.hypot(mx, my), ux = mx / n, uy = my / n, s = Math.sin(fr.camYaw), c = Math.cos(fr.camYaw);
       fr.wantX = ux * c - uy * s; fr.wantY = -ux * s - uy * c;
       // Ayuda para entrar por las puertas: si camina contra la pared justo al lado de un vano, se corre hacia el vano
@@ -2959,17 +3009,19 @@
       fr.yawT = Math.atan2(fr.wantX, fr.wantY);
     }
     doorsStep(dt);
+    ballStep(dt); thingsStep(dt, t);
 
     // Cuerpo: gira hacia donde camina y, según lo que avanzó, mece las piernas (la rodilla se dobla cuando la pierna va hacia
     // adelante y el pie se mantiene casi plano) y los brazos (el codo se dobla más en el brazo que va adelante). Quieto,
     // respira y mira a los lados. Parpadea cada 2 a 5 s. A Alayna se le mecen la falda y el pelo
-    const moved = Math.hypot(fr.x - x0, fr.y - y0), speed = moved / Math.max(dt, 1e-3);
+    const moved = fr.pose ? 0 : Math.hypot(fr.x - x0, fr.y - y0), speed = moved / Math.max(dt, 1e-3);
+    fr.speed = speed;
     const foot = Math.floor(fr.phase / Math.PI);
     fr.phase += moved * Math.PI * 2 / 0.9;
     if (Math.floor(fr.phase / Math.PI) !== foot && fr.amp > 0.15) footstep(0.45 + 0.55 * Math.min(1, speed / 2.4));   // pisó un pie
     fr.amp += (Math.min(1, speed / 1.5) - fr.amp) * Math.min(1, dt * 10);
     fr.yaw += Math.atan2(Math.sin(fr.yawT - fr.yaw), Math.cos(fr.yawT - fr.yaw)) * Math.min(1, dt * 12);
-    const A = fr.amp, ph = fr.phase, sn = Math.sin(ph), cs = Math.cos(ph), sw = sn * 0.55 * A, still = 1 - A, t = now / 1000;
+    const A = fr.amp, ph = fr.phase, sn = Math.sin(ph), cs = Math.cos(ph), sw = sn * 0.55 * A, still = 1 - A;
     [sw, -sw].forEach((hip, i) => {
       const knee = 0.05 + Math.max(0, i ? cs : -cs) * 0.95 * A;
       kid.legs[i].rotation.x = hip; kid.knees[i].rotation.x = knee; kid.feet[i].rotation.x = -(hip + knee) * 0.75;
@@ -2985,8 +3037,20 @@
     kid.eyes.forEach(e => { e.lid.rotation.x = e.open + 2.0 * blink; });
     if (kid.skirt) { kid.skirt.rotation.x = -0.05 * A + Math.sin(ph * 2) * 0.025 * A; kid.skirt.rotation.z = sn * 0.03 * A; }
     if (kid.hair) kid.hair.rotation.x = 0.06 * A + Math.sin(ph * 2) * 0.012 * A;
+    // Salto: sube a 3 m/s y cae con la gravedad; en el aire encoge las piernas y sube los brazos
+    if (fr.jv || fr.jz > 0) {
+      fr.jv -= 9.8 * dt; fr.jz = Math.max(0, fr.jz + fr.jv * dt);
+      if (fr.jz === 0) { if (fr.jv < -1) landSound(); fr.jv = 0; }
+      const k = Math.min(1, fr.jz / 0.15);
+      [0, 1].forEach(i => { kid.legs[i].rotation.x = -0.55 * k; kid.knees[i].rotation.x = 1.0 * k; kid.arms[i].rotation.x = -1.1 * k; kid.elbows[i].rotation.x = -0.5; });
+    }
+    // Saludo: sube el brazo derecho y mueve la mano de lado a lado
+    const wv = t < fr.waveEnd ? Math.min(1, (fr.waveEnd - t) / 0.25, (t - fr.waveEnd + 1.6) / 0.25) : 0;
+    kid.arms[0].rotation.z = -0.1 - 2.55 * wv; kid.elbows[0].rotation.z = Math.sin(t * 14) * 0.5 * wv;
+    if (wv) { kid.arms[0].rotation.x = -0.25 * wv; kid.elbows[0].rotation.x = -0.35 * wv; }
     fr.h += (floorAt(fr.x, fr.y) - fr.h) * Math.min(1, dt * 14);
-    kid.root.position.set(X(fr.x), fr.h, Z(fr.y)); kid.root.rotation.y = fr.yaw;
+    if (fr.pose) applyPose(t);
+    else { kid.root.position.set(X(fr.x), fr.h + fr.jz, Z(fr.y)); kid.root.rotation.set(0, fr.yaw, 0); }
     const room = roomAt(fr.x, fr.y);
     if (room !== fr.room) { fr.room = room; roomEl.textContent = room; }
 
@@ -3003,7 +3067,7 @@
     ch = Math.max(ch, fr.h + 0.45);
     toHouse(camWant.set(X(cx), ch, Z(cy)));
     camWant.y = Math.max(camWant.y, (state.boq ? boqY : groundY)(camWant.x, camWant.z) + 0.3);
-    toHouse(lookWant.set(X(fr.x), fr.h + LOOK_H, Z(fr.y)));
+    toHouse(lookWant.set(X(fr.x), fr.h + (fr.pose ? fr.pose.look : LOOK_H) + fr.jz * 0.5, Z(fr.y)));
     kid.root.visible = fr.camD > 0.45;
     if (fr.fly) {                                             // al entrar, la cámara vuela desde la vista de antes
       const k = Math.min(1, (now - fr.fly.start) / 1100), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
@@ -3234,12 +3298,229 @@
   musicBtn.addEventListener('click', toggleMusic);
   syncMusicBtn();
 
+  /* ---------- juego: pelota, acciones y cosas de la casa ---------- */
+  /* Pedido de la dueña, 2026-09-21 ("jugar con cosas"). Botones redondos sobre el joystick de mirar: Saltar (espacio), Hola
+     —saluda con la mano, como Franco en su foto— (Q) y Pelota, que la trae a sus pies (P). Encima, un botón que cambia según lo
+     que tenga cerca (E): Sentarse en las butacas, Acostarse en las camas (se duerme), Prender o Apagar la luz en los apagadores,
+     Abrir o Cerrar la refri y la llave de la pila. Con un control, A salta, X saluda, B hace la acción de cerca e Y trae la
+     pelota. Moverse lo levanta de la butaca o de la cama */
+
+  // Sonidos de las cosas (van por fx, como los pasos): rebote y patada de la pelota, caída de un salto y clic de apagador
+  function ballSound(v, kick) {
+    if (!sfxOk()) return;
+    const t = MUSIC.ctx.currentTime + 0.005, k = Math.min(1, v / 5);
+    thump(t, (kick ? 0.5 : 0.35) * (0.3 + k), kick ? 190 : 150, 70, 0.09); burst(t, 0.25 * (0.3 + k), 0.05, 'lowpass', 1400);
+  }
+  function landSound() { if (sfxOk()) { const t = MUSIC.ctx.currentTime + 0.005; thump(t, 0.4, 110, 50, 0.1); burst(t, 0.3, 0.06, 'lowpass', 900); } }
+  function clickSound() { if (sfxOk()) latch(MUSIC.ctx.currentTime + 0.005, 0.35); }
+  // El agua de la llave: ruido suave y continuo mientras está abierta
+  function waterSound(on) {
+    if (TAP.src) { try { TAP.src.stop(); } catch (err) { /* ya estaba parado */ } TAP.src = null; }
+    if (!on || !sfxOk()) return;
+    const { ctx } = MUSIC, n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    n.buffer = MUSIC.noise; n.loop = true; f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = 0.6; g.gain.value = 0.07;
+    n.connect(f); f.connect(g); g.connect(MUSIC.fx); n.start(); TAP.src = n;
+  }
+
+  /* Pelota de playa de 0.22 m, con gajos de colores. Rebota en el piso (con la altura de floorAt, así también en la losa y sus
+     gradas), en las paredes y los muebles (OBST), en las hojas de las puertas —y las empuja— y en los bordes del lote; rueda y
+     se frena poco a poco, y no se sube gradas ni se tira de las orillas. El niño la patea al tocarla: más fuerte si corre, y si
+     corre la levanta. Aparece en la sala al entrar al juego */
+  const BALL_R = 0.11;
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 18), std({ roughness: .35, map: tex(384, 192, g => {
+    ['#E53935', '#FDD835', '#1E88E5', '#FFFFFF', '#43A047', '#FB8C00'].forEach((c, i) => { g.fillStyle = c; g.fillRect(i * 64, 0, 65, 192); });
+    g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, 384, 14); g.fillRect(0, 178, 384, 14);
+  }) }));
+  ball.castShadow = true; ball.userData.noPick = true; ball.visible = false; house.add(ball);
+  const BALL = { x: 4.3, y: 5.0, h: FL, vx: 0, vy: 0, vh: 0 }, rollQ = new THREE.Quaternion(), rollAx = new V3();
+  function ballHome(x, y) { Object.assign(BALL, { x, y, h: floorAt(x, y) + 0.25, vx: 0, vy: 0, vh: 0 }); }
+  function ballStep(dt) {
+    if (!ball.visible) return;
+    const floor = floorAt(BALL.x, BALL.y);
+    BALL.vh -= 9.8 * dt; BALL.h += BALL.vh * dt;
+    if (BALL.h <= floor) {
+      if (BALL.vh < -1.2) ballSound(-BALL.vh);
+      BALL.h = floor; BALL.vh = BALL.vh < -0.9 ? -BALL.vh * 0.55 : 0;
+    }
+    const k = BALL.h <= floor + 0.002 ? Math.exp(-0.9 * dt) : Math.exp(-0.05 * dt);       // en el piso se frena más que en el aire
+    BALL.vx *= k; BALL.vy *= k;
+    const sp = Math.hypot(BALL.vx, BALL.vy), n = Math.max(1, Math.ceil(sp * dt / 0.03)), bounce = (nx, ny, e) => {
+      const vn = BALL.vx * nx + BALL.vy * ny;
+      if (vn < 0) { BALL.vx -= (1 + e) * vn * nx; BALL.vy -= (1 + e) * vn * ny; if (-vn > 1) ballSound(-vn); }
+    };
+    for (let i = 0; i < n && sp > 0.01; i++) {
+      let x = BALL.x + BALL.vx * dt / n, y = BALL.y + BALL.vy * dt / n;
+      for (const o of OBST) {                                      // paredes y muebles: rebota
+        if (o[4] === 'furn' && !state.furn) continue;
+        const qx = Math.max(o[0], Math.min(x, o[1])), qy = Math.max(o[2], Math.min(y, o[3])), dx = x - qx, dy = y - qy, d = Math.hypot(dx, dy);
+        if (d >= BALL_R || d < 1e-9) continue;
+        x = qx + dx / d * BALL_R; y = qy + dy / d * BALL_R; bounce(dx / d, dy / d, 0.6);
+      }
+      for (const dr of DOORS) {                                    // hojas de puerta: rebota y la empuja un poco
+        const a = dr.rot0 + dr.th, ux = Math.cos(a), uy = -Math.sin(a);
+        const t = Math.max(0, Math.min(dr.L, (x - dr.hx) * ux + (y - dr.hy) * uy)), dx = x - dr.hx - ux * t, dy = y - dr.hy - uy * t, d = Math.hypot(dx, dy);
+        if (d >= BALL_R + LEAF_T || d < 1e-9) continue;
+        const vn = BALL.vx * dx / d + BALL.vy * dy / d;
+        x += dx / d * (BALL_R + LEAF_T - d); y += dy / d * (BALL_R + LEAF_T - d); bounce(dx / d, dy / d, 0.5);
+        const sg = Math.sign(Math.cos(a) * (y - dr.hy) + Math.sin(a) * (x - dr.hx)) || 1;
+        if (vn < -0.3) { dr.w = Math.max(-3, Math.min(3, dr.w + sg * -vn * 1.2 * t / dr.L)); dr.hold = 0.5; }
+      }
+      const f1 = floorAt(x, y);
+      if (!canStand(x, y, BALL_R) || f1 - BALL.h > 0.07 || BALL.h - f1 > 0.45) {          // borde, grada o precipicio: se devuelve
+        BALL.vx *= -0.5; BALL.vy *= -0.5; break;
+      }
+      BALL.x = x; BALL.y = y;
+    }
+    // El niño la patea: la empuja lejos de él, más fuerte si corre, y si corre la levanta
+    const dx = BALL.x - fr.x, dy = BALL.y - fr.y, d = Math.hypot(dx, dy);
+    if (!fr.pose && d < FR_R + BALL_R && BALL.h - (fr.h + fr.jz) < 0.6) {
+      const ux = dx / (d || 1), uy = dy / (d || 1), push = Math.max(1.3, fr.speed * 1.8);
+      BALL.vx = ux * push; BALL.vy = uy * push; if (fr.speed > 1.8 && BALL.h <= floor + 0.01) BALL.vh = 2.3;
+      BALL.x = fr.x + ux * (FR_R + BALL_R + 0.005); BALL.y = fr.y + uy * (FR_R + BALL_R + 0.005);
+      if (fr.speed > 0.3) { ballSound(push, true); express('feliz', 1.2); }
+    }
+    // Rueda: gira sobre el eje acostado perpendicular a su camino, lo que avanzó entre su radio
+    const mv = Math.hypot(BALL.vx, BALL.vy) * dt;
+    if (mv > 1e-5 && BALL.h <= floor + 0.01) { rollAx.set(BALL.vy, 0, -BALL.vx).normalize(); rollQ.setFromAxisAngle(rollAx, mv / BALL_R); ball.quaternion.premultiply(rollQ); }
+    ball.position.set(X(BALL.x), BALL.h + BALL_R, Z(BALL.y));
+  }
+
+  /* Apagadores: uno adentro de cada cuarto, junto a su puerta (la sala, junto a la principal; el corredor, por fuera; el de la
+     puerta de atrás es el que ya estaba). Cada uno manda las luces de su cuarto (índices de roomLights) y se usa desde reach */
+  const plateM = kidMat(0xF4F2EE, { roughness: .5 });
+  const SWITCHES = [
+    { at: [4.25, 5.955], n: [0, -1], lights: [3, 4], reach: [4.25, 5.6] },
+    { at: [4.25, 6.045], n: [0, 1], lights: [5], reach: [4.25, 6.45] },
+    { at: [1.85, 2.455], n: [0, -1], lights: [0], reach: [1.55, 2.28] },
+    { at: [1.85, 4.045], n: [0, 1], lights: [1], reach: [1.55, 4.3] },
+    { at: [1.925, 2.85], n: [-1, 0], lights: [2], reach: [1.7, 3.3] },
+    { at: [4.23, -0.045], n: [0, -1], lights: [6], reach: [4.23, -0.45], old: true },
+  ];
+  SWITCHES.forEach(sw => {
+    const [x, y] = sw.at, alongX = sw.n[0] === 0;
+    if (!sw.old) addBox(alongX ? 0.075 : 0.01, 0.115, alongX ? 0.01 : 0.075, plateM, X(x), FL + 1.2, Z(y));
+    sw.rocker = addBox(alongX ? 0.022 : 0.012, 0.04, alongX ? 0.012 : 0.022, plateM, X(x + sw.n[0] * 0.008), FL + (sw.old ? 1.26 : 1.2), Z(y + sw.n[1] * 0.008));
+  });
+  const nightNow = () => 1 - smooth(-0.2, 0.02, Math.sin((lastHour - 6) / 12 * Math.PI));
+  const lit = i => { const on = roomLights[i].userData.on; return on == null ? nightNow() > 0.3 : on; };
+  function toggleSwitch(sw) {
+    const on = !sw.lights.some(lit);
+    sw.lights.forEach(i => { roomLights[i].userData.on = on; });
+    applyHour(lastHour); clickSound();
+    sw.rocker.rotation[sw.n[0] === 0 ? 'x' : 'z'] = (on ? -0.35 : 0.35) * (sw.n[0] + sw.n[1]);
+  }
+
+  // Poses: sentado en una butaca o acostado en una cama. hx, hy: dónde queda la cadera o la cabeza; from: de dónde se levanta
+  const QX = new THREE.Quaternion().setFromAxisAngle(new V3(1, 0, 0), -Math.PI / 2), QY = new THREE.Quaternion(), UP = new V3(0, 1, 0);
+  function startPose(p) {
+    fr.pose = Object.assign(p, { from: [fr.x, fr.y] });
+    fr.x = p.cx; fr.y = p.cy; fr.jz = fr.jv = 0;
+  }
+  function endPose() {
+    if (!fr.pose) return;
+    [fr.x, fr.y] = fr.pose.from; fr.pose = null;
+    kid.root.quaternion.identity(); kid.body.rotation.set(0, 0, 0);
+  }
+  function applyPose(t) {
+    const P = fr.pose, s = kid.root.scale.x;
+    kid.head.rotation.set(0, 0, 0);
+    if (P.kind === 'sit') {
+      kid.root.position.set(X(P.hx), FL + P.seat + 0.02 - 0.52 * s, Z(P.hy)); kid.root.rotation.set(0, P.face, 0);
+      kid.body.rotation.set(-0.12, 0, 0); kid.body.position.y = Math.sin(t * 2.4) * 0.003;
+      [0, 1].forEach(i => {
+        kid.legs[i].rotation.x = -1.5; kid.knees[i].rotation.x = 1.35 + Math.sin(t * 3 + i * Math.PI) * 0.22;   // columpia los pies
+        kid.feet[i].rotation.x = 0.1; kid.arms[i].rotation.x = -0.5; kid.elbows[i].rotation.x = -0.95;
+      });
+      kid.head.rotation.y = Math.sin(t * 0.6) * 0.35;
+    } else {
+      QY.setFromAxisAngle(UP, P.psi); kid.root.quaternion.copy(QY).multiply(QX);
+      kid.root.position.set(X(P.hx - P.dx * 0.985 * s), FL + P.top + 0.09 * s, Z(P.hy - P.dy * 0.985 * s));
+      kid.body.rotation.set(0, 0, 0); kid.body.position.y = Math.sin(t * 1.3) * 0.004;     // respira despacio
+      [0, 1].forEach(i => { kid.legs[i].rotation.x = 0; kid.knees[i].rotation.x = 0.05; kid.feet[i].rotation.x = 0; kid.arms[i].rotation.x = 0; kid.elbows[i].rotation.x = -0.1; });
+      kid.eyes.forEach(e => { e.lid.rotation.x = e.open + 2.0; });                          // dormido
+    }
+  }
+
+  // Todo lo que se puede usar de cerca: dónde pararse (cerca de p, a menos de r), qué dice el botón y qué hace
+  const nearRect = (x0, x1, y0, y1) => (x, y) => Math.hypot(x - Math.max(x0, Math.min(x, x1)), y - Math.max(y0, Math.min(y, y1)));
+  const nearPoint = (px, py) => (x, y) => Math.hypot(x - px, y - py);
+  const THINGS = [
+    ...[4.49, 5.55].map(y => ({ d: nearPoint(4.75, y), r: 0.7, label: () => 'Sentarse',
+      act: () => startPose({ kind: 'sit', hx: 5.4, hy: y, cx: 4.9, cy: y, seat: 0.52, face: -Math.PI / 2, look: 0.95 }) })),
+    { d: nearRect(1.24, 2.66, 0.1, 2.05), r: 0.45, label: () => 'Acostarse',
+      act: () => startPose({ kind: 'lie', hx: 1.95, hy: 0.36, dx: 0, dy: -1, psi: 0, top: 0.53, cx: 1.95, cy: 1.2, look: 0.75 }) },
+    { d: nearRect(0.07, 2.08, 4.58, 6.02), r: 0.45, label: () => 'Acostarse',
+      act: () => startPose({ kind: 'lie', hx: 0.38, hy: 5.3, dx: -1, dy: 0, psi: Math.PI / 2, top: 0.53, cx: 1.2, cy: 5.3, look: 0.75 }) },
+    ...SWITCHES.map(sw => ({ d: nearPoint(...sw.reach), r: 0.55, label: () => sw.lights.some(lit) ? 'Apagar la luz' : 'Prender la luz', act: () => toggleSwitch(sw) })),
+    { d: nearPoint(4.9, 2.25), r: 0.6, label: () => FRIDGE.target ? 'Cerrar la refri' : 'Abrir la refri',
+      act: () => { FRIDGE.target = FRIDGE.target ? 0 : 1; doorSound(FRIDGE.target ? 'open' : 'close', 1.5); } },
+    { d: nearPoint(5.42, -0.85), r: 0.6, label: () => TAP.open ? 'Cerrar la llave' : 'Abrir la llave',
+      act: () => { TAP.open = !TAP.open; TAP.stream.visible = TAP.open; waterSound(TAP.open); clickSound(); } },
+  ];
+  const ctxBtn = $('#act-ctx');
+  let ctxThing = null;
+  function useCtx() {
+    if (!fr.on) return;
+    if (fr.pose) { endPose(); return; }
+    if (ctxThing) ctxThing.act();
+  }
+  function jump() { if (fr.on && !fr.pose && fr.jz === 0) { fr.jv = 3.0; express('feliz', 0.8); } }
+  function wave() { if (fr.on && !fr.pose) { fr.waveEnd = performance.now() / 1000 + 1.6; express('feliz', 1.6); } }
+  function fetchBall() {
+    if (!fr.on) return;
+    const x = fr.x + Math.sin(fr.yaw) * 0.45, y = fr.y + Math.cos(fr.yaw) * 0.45;
+    if (canStand(x, y, BALL_R)) ballHome(x, y); else ballHome(fr.x, fr.y + 0.01);
+  }
+  // Cada cuadro: qué hay cerca (el botón cambia de texto), la puerta de la refri, el agua de la pila y los apagadores
+  function thingsStep(dt, t) {
+    let best = null, bd = 1e9;
+    if (!fr.pose) THINGS.forEach(th => { const d = th.d(fr.x, fr.y); if (d < th.r && d < bd) { bd = d; best = th; } });
+    ctxThing = best;
+    const label = fr.pose ? 'Levantarse' : best ? best.label() : '';
+    if (ctxBtn.textContent !== label) ctxBtn.textContent = label;
+    ctxBtn.hidden = !label;
+    FRIDGE.open += (FRIDGE.target - FRIDGE.open) * Math.min(1, dt * 5);
+    FRIDGE.door.rotation.y = -1.9 * FRIDGE.open; FRIDGE.inner.emissiveIntensity = 0.55 * FRIDGE.open; FRIDGE.light.intensity = 0.7 * FRIDGE.open;
+    TAP.level = Math.max(0, Math.min(1, TAP.level + (TAP.open ? 0.12 : -0.03) * dt));   // se llena en 8 s y se vacía despacio
+    TAP.pool.visible = TAP.level > 0.01; TAP.pool.position.y = FL + 0.775 + 0.12 * TAP.level;
+    if (TAP.open) TAP.stream.scale.set(1 + Math.sin(t * 40) * 0.08, 1, 1 + Math.cos(t * 37) * 0.08);
+  }
+  // Al salir del juego todo vuelve a como estaba: luces según la hora, refri y llave cerradas, sin pelota
+  function resetThings() {
+    endPose();
+    roomLights.forEach(L => { L.userData.on = null; }); applyHour(lastHour);
+    SWITCHES.forEach(sw => { sw.rocker.rotation.set(0, 0, 0); });
+    FRIDGE.open = FRIDGE.target = 0; FRIDGE.door.rotation.y = 0; FRIDGE.inner.emissiveIntensity = 0; FRIDGE.light.intensity = 0;
+    TAP.open = false; TAP.level = 0; TAP.stream.visible = TAP.pool.visible = false; waterSound(false);
+    ball.visible = false;
+  }
+  // Botones: se usan al tocarlos (pointerdown, sin esperar a soltar) para que respondan rápido en el teléfono
+  [['#act-jump', jump], ['#act-wave', wave], ['#act-ball', fetchBall], ['#act-ctx', useCtx]].forEach(([id, fn]) =>
+    $(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); }));
+  window.addEventListener('keydown', e => {
+    if (!fr.on || e.repeat) return;
+    if (e.code === 'Space') { e.preventDefault(); jump(); }
+    else if (e.code === 'KeyQ') wave();
+    else if (e.code === 'KeyE') useCtx();
+    else if (e.code === 'KeyP') fetchBall();
+  });
+  // Botones del control: A (0) salta, B (1) acción de cerca, X (2) saluda, Y (3) pelota. Solo al apretar, no mientras se sostiene
+  const padPrev = [];
+  function padButtons(pad) {
+    [jump, useCtx, wave, fetchBall].forEach((fn, i) => {
+      const on = !!(pad && pad.buttons[i] && pad.buttons[i].pressed);
+      if (on && !padPrev[i]) fn();
+      padPrev[i] = on;
+    });
+  }
+  let express = () => {};                                     // caras: se definen con los personajes
+
   const hud = $('#play-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof'), swapBtn = $('#fh-swap');
   const playBtn = $('#v-play'), playMenu = $('#play-menu');
   function playFov() { camera.fov = camera.aspect < 1 ? 70 : 60; camera.updateProjectionMatrix(); }
   // Cambia el niño que se juega; el otro se esconde. Sigue en el mismo lugar, mirando para el mismo lado
   function setKid(who) {
-    kid.root.visible = false;
+    endPose(); kid.root.visible = false;
     fr.who = who; kid = KIDS[who]; kid.root.visible = fr.on;
     const other = KIDS[who === 'franco' ? 'alayna' : 'franco'].name;
     $('#fh-name').textContent = kid.name;
@@ -3258,13 +3539,15 @@
       // Arranca en el corredor, frente a la puerta principal, con la cámara detrás
       Object.assign(fr, { x: 3.54, y: 6.62, h: FL - 0.03, yaw: Math.PI, yawT: Math.PI, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, amp: 0, room: '', blinkAt: 0, blinkEnd: 0 });
       setRoof(true); roofBtn.setAttribute('aria-pressed', 'true');
+      Object.assign(fr, { jz: 0, jv: 0, waveEnd: 0, speed: 0 });
+      ballHome(4.3, 5.0); ball.visible = true;                    // la pelota espera en la sala
       doorLimits();
       DOORS.forEach(d => { d.th = d.w = d.hold = d.pull = 0; d.leaf.rotation.y = d.rot0; });
       fr.fly = reduceMotion ? null : { p0: camera.position.clone(), t0: controls.target.clone(), start: performance.now() };
       playFov();
       canvas.focus({ preventScroll: true });
     } else {
-      kid.root.visible = false; playMusic(null);
+      resetThings(); kid.root.visible = false; playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
       camera.fov = 42; camera.updateProjectionMatrix();
