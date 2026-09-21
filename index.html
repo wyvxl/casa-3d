@@ -206,7 +206,7 @@
     .ctl-body .room-btn,.ctl-body .room-desc{padding-left:2px}
     .ctl-body .room-desc{padding-left:24px}
     .move-row label{letter-spacing:.1em}
-    .move .note{display:none}                                 /* no aporta en pantalla chica */
+    .move .note,#names-note{display:none}                     /* no aportan en pantalla chica */
   }
   @media (prefers-reduced-motion: reduce){ .chev,.hint{transition:none} }
 </style>
@@ -1673,9 +1673,11 @@
   });
 
   const dimMat = new THREE.MeshBasicMaterial({ color: 0xFBFAF6 });
-  function dimLine(x1, y1, x2, y2, text, grp = dims) {
+  // k: dónde va la etiqueta sobre la línea, de 0 (en x1, y1) a 1 (en x2, y2). Por omisión al centro; se corre cuando
+  // la etiqueta chocaría con otra, como la distancia al vecino de la izquierda contra la medida de 7.00 de la casa
+  function dimLine(x1, y1, x2, y2, text, grp = dims, k = 0.5) {
     const horiz = Math.abs(y1 - y2) < 1e-6, len = horiz ? Math.abs(x2 - x1) : Math.abs(y2 - y1), yy = 0.06;
-    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, lx = x1 + (x2 - x1) * k, ly = y1 + (y2 - y1) * k;
     const line = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : 0.02, 0.012, horiz ? 0.02 : len), dimMat);
     line.position.set(X(mx), yy, Z(my)); grp.add(line);
     [[x1, y1], [x2, y2]].forEach(([px, py]) => {
@@ -1684,7 +1686,7 @@
       const ext = new THREE.Mesh(new THREE.BoxGeometry(horiz ? 0.015 : 0.36, 0.012, horiz ? 0.36 : 0.015), dimMat);
       ext.position.set(X(px), yy, Z(py)); grp.add(ext);
     });
-    addLabel('dim', text, new V3(X(mx), yy, Z(my))).grp = grp;
+    addLabel('dim', text, new V3(X(lx), yy, Z(ly))).grp = grp;
   }
   dimLine(0, -1.0, 3.0, -1.0, '3.00'); dimLine(3.0, -1.0, W, -1.0, '2.88');
   dimLine(-0.55, 0, -0.55, 2.5, '2.50'); dimLine(-0.55, 2.5, -0.55, 4.0, '1.50'); dimLine(-0.55, 4.0, -0.55, D, '3.00');
@@ -1724,8 +1726,12 @@
   // la calle del lado derecho se parte en casa-muro y muro-calle (nowDims y boqDims, dentro de lotDims)
   const nowDims = new THREE.Group(), boqDims = new THREE.Group(), losaDims = new THREE.Group();
   lotDims.add(nowDims, boqDims, losaDims);
+  /* Las distancias de la casa al borde del lote van en su propio grupo (hDims), aparte de lotDims, porque se ven en todas las
+     vistas y no solo en Lote (pedido de la dueña, 2026-09-21). hNow es la distancia a la calle con el terreno de hoy y hBoq la
+     misma partida en casa-muro y muro-calle cuando está el boquete: se prende una u otra desde setBoq() */
+  const hDims = new THREE.Group(); scene.add(hDims);
   const hNow = new THREE.Group(), hBoq = new THREE.Group(), hLot = new THREE.Group();
-  nowDims.add(hNow); boqDims.add(hBoq); lotDims.add(hLot);
+  hDims.add(hNow, hBoq, hLot);
   const zAt = x => cross(0, x), xrW = LOT[0][0] - 0.01;                      // xrW: sobre la colindancia derecha
   addLabel('dim', 'Boquete a nivel de calle', new V3(boqMid[0], 0.06, boqMid[1])).grp = boqDims;
   // Corrida hacia la calle, para que no se encime con la del boquete, que va en el centro del piso de abajo
@@ -1766,7 +1772,7 @@
     dimLine(xl, yFL, xl, zFL + D / 2, (zFL - Z(yFL)).toFixed(2), hLot);
     dimLine(xl, yBL, xl, zBL + D / 2, (Z(yBL) - zBL).toFixed(2), hLot);
     const [mx, my] = hp(-0.06, D / 2), [xL] = cross(1, Z(my)), gap = X(mx) - xL;   // al vecino de la izquierda, a media casa
-    dimLine(mx, my, xL + W / 2, my, gap.toFixed(2), hLot);
+    dimLine(mx, my, xL + W / 2, my, gap.toFixed(2), hLot, 0.75);      // la etiqueta, cerca de la línea del lote
     $('#lot-gap').innerHTML = `${gap.toFixed(2)}<small>m</small>`;
   }
   houseDims();
@@ -1789,14 +1795,18 @@
   function setRoof(v) { state.roof = v; roof.visible = v; $('#t-roof').checked = v; syncNote(); }
   function setFurn(v) { state.furn = v; furn.visible = v; $('#t-furn').checked = v; }
   function setNames(v) { state.names = v; $('#t-names').checked = v; syncNote(); }
-  // Medidas: las de la casa en todas las vistas menos Lote, y las del lote solo en la vista Lote
-  function setDims(v) { state.dims = v; dims.visible = v && state.view !== 'lote'; lotDims.visible = v && state.view === 'lote'; $('#t-dims').checked = v; }
+  /* Medidas: las de la casa en todas las vistas menos Lote, las del lote solo en Lote, y las distancias de la casa al borde
+     del lote (hDims) en todas, que es para lo que sirven */
+  function setDims(v) {
+    state.dims = v; dims.visible = v && state.view !== 'lote'; lotDims.visible = v && state.view === 'lote';
+    hDims.visible = v; $('#t-dims').checked = v;
+  }
   function setNb(v) { state.nb = v; neighbors.visible = v; $('#t-nb').checked = v; }
   function setExtra(v) { state.extra = v; extra.visible = v; $('#t-extra').checked = v; }   // grada y plantas: se decide después
   // Boquete (proyecto): cambia el terreno y lo que depende de él entre hoy y con el boquete
   function setBoq(v) {
     state.boq = v; $('#t-boq').checked = v; setGround(v);
-    today.visible = extraNow.visible = nowDims.visible = !v; boqG.visible = extraBoq.visible = boqDims.visible = v;
+    today.visible = extraNow.visible = nowDims.visible = hNow.visible = !v; boqG.visible = extraBoq.visible = boqDims.visible = hBoq.visible = v;
     if (!v) setLosa(false);                                  // sin boquete no hay losa
     fitHouse();                                              // con el boquete la casa no puede quedar sobre la excavación
   }
