@@ -206,11 +206,16 @@
   .stick-lbl{position:absolute;left:50%;bottom:100%;transform:translate(-50%,-8px);padding:4px 7px 3px;background:var(--paper);border:1px solid var(--rule);font:600 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--ink);white-space:nowrap;pointer-events:none}
   .acts{position:absolute;right:calc(24px + env(safe-area-inset-right,0px));bottom:calc(190px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:10px}
   .act-row{display:flex;align-items:center;gap:8px}
-  .act{width:58px;height:58px;padding:0;border-radius:50%;border:1px solid var(--rule-strong);background:var(--glass);color:var(--ink);box-shadow:var(--shadow);
-    font:700 12px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+  .act{display:grid;place-items:center;width:58px;height:58px;padding:0;border-radius:50%;border:1px solid var(--rule-strong);background:var(--glass);color:var(--ink);box-shadow:var(--shadow);
+    cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+  .act svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
   .act:active{background:var(--accent);color:var(--paper)}
-  .act-main{width:68px;height:68px;background:var(--ink);color:var(--paper);font-size:13px}
-  .act-ctx{width:auto;height:46px;padding:0 20px;border-radius:23px;background:var(--accent);color:var(--paper);border-color:var(--accent);font-size:14px;letter-spacing:.08em}
+  .act-main{width:68px;height:68px;background:var(--ink);color:var(--paper)}
+  .act-main svg{width:32px;height:32px}
+  /* El botón de lo que está cerca: redondo, con el ícono de la acción (el texto va en title y aria-label) y un saltito al aparecer */
+  .act-ctx{width:68px;height:68px;background:var(--accent);color:var(--paper);border-color:var(--accent);animation:act-pop .25s ease}
+  .act-ctx svg{width:34px;height:34px}
+  @keyframes act-pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
   .fh-keys{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);margin:0;padding:7px 12px;background:var(--paper);border:1px solid var(--rule);color:var(--ink-2);font-size:12.5px;white-space:nowrap;pointer-events:none}
   @media (hover: none), (max-width: 1100px){ .fh-keys{display:none} }
 
@@ -272,8 +277,10 @@
     .stick-move{left:calc(18px + env(safe-area-inset-left,0px))}
     .stick-look{right:calc(18px + env(safe-area-inset-right,0px))}
     .acts{right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(166px + env(safe-area-inset-bottom,0px))}
-    .act{width:52px;height:52px;font-size:11px}
-    .act-main{width:60px;height:60px}
+    .act{width:52px;height:52px}
+    .act svg{width:25px;height:25px}
+    .act-main,.act-ctx{width:60px;height:60px}
+    .act-main svg,.act-ctx svg{width:30px;height:30px}
   }
   @media (prefers-reduced-motion: reduce){ .chev,.hint{transition:none} }
 </style>
@@ -388,9 +395,9 @@
   <div class="acts">
     <button type="button" class="act act-ctx" id="act-ctx" hidden></button>
     <div class="act-row">
-      <button type="button" class="act" id="act-ball" title="Traer la pelota (P)">Pelota</button>
-      <button type="button" class="act" id="act-wave" title="Saludar (Q)">Hola</button>
-      <button type="button" class="act act-main" id="act-jump" title="Saltar (espacio)">Saltar</button>
+      <button type="button" class="act" id="act-ball" title="Traer la pelota (P)" aria-label="Traer la pelota"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.6l3.2 2.3-1.2 3.8h-4l-1.2-3.8zM12 8.6V3.5M15.2 10.9l4.7-1.6M14 14.7l2.9 4M10 14.7l-2.9 4M8.8 10.9 4.1 9.3"/></svg></button>
+      <button type="button" class="act" id="act-wave" title="Saludar (Q)" aria-label="Saludar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12.5V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5M14 10.5V5.5a1.5 1.5 0 0 1 3 0v7M8 12.5v-2a1.5 1.5 0 0 0-3 0v3.5a7 7 0 0 0 7 7h.5a6.5 6.5 0 0 0 6.5-6.5v-2M19.8 3.2l1.4-1.2M21 6.6h1.6"/></svg></button>
+      <button type="button" class="act act-main" id="act-jump" title="Saltar (espacio)" aria-label="Saltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V5M6.5 10.5 12 5l5.5 5.5M5 21h14"/></svg></button>
     </div>
   </div>
   <p class="fh-keys">WASD o flechas: caminar · Shift: correr · Espacio: saltar · Q: saludar · E: usar · P: pelota · M: sonido · Esc: salir</p>
@@ -2252,9 +2259,25 @@
   /* Piezas comunes. Los dos niños comparten el esqueleto: cabeza, hombros con codo y mano, y caderas con rodilla y pie, para
      mover todo al caminar. Miran hacia +Z, los pies quedan en y = 0 y miden 1.10 m sin el pelo; scale los agranda o achica */
   const kidMat = (c, o) => std(Object.assign({ color: c, roughness: .8 }, o));
+  let wearing = null;                                         // mientras se arma una muda de ropa, sus piezas se anotan aquí
   const kidPart = (geo, m, x, y, z, parent) => {
-    const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.userData.noPick = true; parent.add(o); return o;
+    const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.userData.noPick = true; parent.add(o);
+    if (wearing) wearing.push(o);
+    return o;
   };
+  // Una muda de ropa: arma sus piezas y las devuelve juntas (con lo que devuelva build, como la falda que se mece), para
+  // prenderlas o apagarlas de una vez con setOutfit
+  const outfit = build => { wearing = []; const extra = build() || {}; const parts = wearing; wearing = null; return Object.assign({ parts }, extra); };
+  function setOutfit(k, name) {
+    Object.entries(k.outfits).forEach(([n, o]) => o.parts.forEach(p => { p.visible = n === name; }));
+    k.outfitName = name; k.skirt = k.outfits[name].skirt || null;
+  }
+  // Estrella de cinco puntas (la insignia de la camisa de policía)
+  function star(g, x, y, r) {
+    g.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? r * 0.45 : r; g.lineTo(x + Math.cos(a) * k, y + Math.sin(a) * k); }
+    g.closePath(); g.fill();
+  }
   const lathe = (pts, seg = 40) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
   // Pinta una geometría de un color (para juntarla con otras en una sola malla con colores por vértice)
   const tint = (geo, c, c2, along) => {
@@ -2480,65 +2503,146 @@
   const franco = kidRig('Franco', 0xECC3A4, 1);
   {
     const { body, head, arms, legs, feet } = franco;
-    kidPart(headGeo(0.005), std({ map: faceTex('#ECC3A4', 'rgba(232,120,110,.42)', (g, soft) => {
-      [-1, 1].forEach(s => brow(g, s, 0.036, 0.043, 44, 7, '#8A5A3B', 3.2, 21));   // cejas finas, castaño claro
-      // Boca pequeña y entreabierta, como en las fotos: se asoman los dientes de arriba; labio de arriba con el arco de
-      // cupido, el de abajo más lleno y con brillo, y las comisuras
+    // La cara en tres ánimos (express): normal, feliz (sonrisa abierta) y sorpresa (boca en O y cejas arriba)
+    const face = mood => faceTex('#ECC3A4', 'rgba(232,120,110,.42)', (g, soft) => {
+      const up = mood === 'sorpresa' ? 0.006 : mood === 'feliz' ? 0.002 : 0;
+      [-1, 1].forEach(s => brow(g, s, 0.036, 0.043 + up, 44, mood === 'sorpresa' ? 10 : 7, '#8A5A3B', 3.2, 21));   // cejas finas, castaño claro
       const [mx, my] = facePx(0, -0.046);
       soft(mx, my + 15, 22, 'rgba(120,50,45,.12)');
-      g.fillStyle = '#6E2C29'; g.beginPath(); g.ellipse(mx, my + 1, 10, 4, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#F2EEE8'; g.fillRect(mx - 7, my - 2, 14, 2.6);
-      g.fillStyle = '#C97A70'; g.beginPath(); g.moveTo(mx - 25, my + 1); g.quadraticCurveTo(mx - 14, my - 7, mx - 4, my - 6);
-      g.quadraticCurveTo(mx, my - 3, mx + 4, my - 6); g.quadraticCurveTo(mx + 14, my - 7, mx + 25, my + 1);
-      g.quadraticCurveTo(mx + 10, my - 1.5, mx, my - 1); g.quadraticCurveTo(mx - 10, my - 1.5, mx - 25, my + 1); g.fill();
-      const lg = g.createLinearGradient(0, my + 2, 0, my + 14); lg.addColorStop(0, '#CF8278'); lg.addColorStop(1, '#DE978C');
-      g.fillStyle = lg; g.beginPath(); g.moveTo(mx - 21, my + 2); g.quadraticCurveTo(mx, my + 16, mx + 21, my + 2); g.quadraticCurveTo(mx, my + 5, mx - 21, my + 2); g.fill();
-      g.fillStyle = 'rgba(255,255,255,.28)'; g.beginPath(); g.ellipse(mx + 3, my + 8, 6, 1.8, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = 'rgba(110,40,35,.4)'; [-1, 1].forEach(s => { g.beginPath(); g.arc(mx + s * 25, my + 1, 1.8, 0, Math.PI * 2); g.fill(); });
-    }), roughness: .6 }), 0, 0, 0, head);
+      if (mood === 'normal') {
+        // Boca pequeña y entreabierta, como en las fotos: se asoman los dientes de arriba; labio de arriba con el arco de
+        // cupido, el de abajo más lleno y con brillo, y las comisuras
+        g.fillStyle = '#6E2C29'; g.beginPath(); g.ellipse(mx, my + 1, 10, 4, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#F2EEE8'; g.fillRect(mx - 7, my - 2, 14, 2.6);
+        g.fillStyle = '#C97A70'; g.beginPath(); g.moveTo(mx - 25, my + 1); g.quadraticCurveTo(mx - 14, my - 7, mx - 4, my - 6);
+        g.quadraticCurveTo(mx, my - 3, mx + 4, my - 6); g.quadraticCurveTo(mx + 14, my - 7, mx + 25, my + 1);
+        g.quadraticCurveTo(mx + 10, my - 1.5, mx, my - 1); g.quadraticCurveTo(mx - 10, my - 1.5, mx - 25, my + 1); g.fill();
+        const lg = g.createLinearGradient(0, my + 2, 0, my + 14); lg.addColorStop(0, '#CF8278'); lg.addColorStop(1, '#DE978C');
+        g.fillStyle = lg; g.beginPath(); g.moveTo(mx - 21, my + 2); g.quadraticCurveTo(mx, my + 16, mx + 21, my + 2); g.quadraticCurveTo(mx, my + 5, mx - 21, my + 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,.28)'; g.beginPath(); g.ellipse(mx + 3, my + 8, 6, 1.8, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(110,40,35,.4)'; [-1, 1].forEach(s => { g.beginPath(); g.arc(mx + s * 25, my + 1, 1.8, 0, Math.PI * 2); g.fill(); });
+      } else if (mood === 'feliz') {
+        const smile = () => { g.beginPath(); g.moveTo(mx - 30, my - 4); g.quadraticCurveTo(mx, my + 2, mx + 30, my - 4);
+          g.quadraticCurveTo(mx + 20, my + 22, mx, my + 23); g.quadraticCurveTo(mx - 20, my + 22, mx - 30, my - 4); };
+        g.fillStyle = '#5E1F1F'; smile(); g.fill(); g.save(); smile(); g.clip();
+        g.fillStyle = '#FBF8F2'; g.fillRect(mx - 32, my - 6, 64, 12);
+        g.fillStyle = '#C0615C'; g.beginPath(); g.ellipse(mx, my + 20, 13, 6, 0, 0, Math.PI * 2); g.fill(); g.restore();
+        g.strokeStyle = '#C97A70'; g.lineWidth = 3.5; smile(); g.stroke();
+      } else {
+        g.fillStyle = '#5A1E1E'; g.beginPath(); g.ellipse(mx, my + 5, 9, 12, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = '#CF8278'; g.lineWidth = 4.5; g.stroke();
+      }
+    });
+    franco.faces = { normal: face('normal'), feliz: face('feliz'), sorpresa: face('sorpresa') };
+    franco.faceMat = std({ map: franco.faces.normal, roughness: .6 }); franco.mood = 'normal';
+    kidPart(headGeo(0.005), franco.faceMat, 0, 0, 0, head);
     franco.eyes = [-1, 1].map(s => kidEye(head, s, { iris: 0x6B4428, skinM: franco.skinM, lash: 0x3A2419, lashW: 0.0011, lashes: false, open: -0.56 }));
-    // Camiseta: tronco con forma de niño (pancita incluida), costuras a los lados, ruedo pespunteado y la carita del pecho.
-    // Se gira media vuelta para que el centro del lienzo quede adelante; un poco a la derecha del centro es la izquierda de él
-    const shirtTex = tex(512, 256, (g, w, h, r) => {
-      g.fillStyle = '#1E2023'; g.fillRect(0, 0, w, h);
-      speckle(g, w, h, r, 2600, ['rgba(255,255,255,.035)', 'rgba(0,0,0,.2)'], [1, 2]);
-      g.fillStyle = 'rgba(255,255,255,.07)'; [128, 384].forEach(x => g.fillRect(x - 1, 0, 2, h));
-      g.strokeStyle = 'rgba(255,255,255,.12)'; g.setLineDash([4, 4]); g.lineWidth = 1.5;
-      g.beginPath(); g.moveTo(0, h - 9); g.lineTo(w, h - 9); g.stroke(); g.setLineDash([]);
-      const cx = 268, cy = 96; g.strokeStyle = g.fillStyle = '#F2F0EA'; g.lineWidth = 3.4;
-      g.beginPath(); g.ellipse(cx, cy, 19, 15, 0, 0, Math.PI * 2); g.stroke();
-      [-7, 7].forEach(dx => { g.beginPath(); g.ellipse(cx + dx, cy - 4, 2.3, 3.4, 0, 0, Math.PI * 2); g.fill(); });
-      g.beginPath(); g.ellipse(cx, cy + 1, 10, 7.5, 0, 0.12 * Math.PI, 0.88 * Math.PI); g.stroke();
-    }, 41);
-    shirtTex.wrapT = THREE.ClampToEdgeWrapping;
-    const shirtM = kidMat(0xffffff, { map: shirtTex, roughness: .92 }), black = kidMat(0x222428, { roughness: .92 });
-    const torso = kidPart(lathe([[0.129, 0.5], [0.125, 0.53], [0.121, 0.56], [0.122, 0.59], [0.124, 0.62], [0.125, 0.65], [0.125, 0.68],
-      [0.124, 0.71], [0.122, 0.74], [0.12, 0.77], [0.116, 0.8], [0.105, 0.83], [0.085, 0.855], [0.06, 0.873], [0.046, 0.884]], 44), shirtM, 0, 0, 0, body);
-    torso.rotation.y = Math.PI; torso.scale.z = 0.74;
-    const collar = kidPart(new THREE.TorusGeometry(0.045, 0.0075, 8, 28), black, 0, 0.879, 0, body);          // cuello redondo
-    collar.rotation.x = Math.PI / 2; collar.scale.y = 0.8;
-    arms.forEach(a => {                                                 // manga corta con su ruedo
-      kidPart(new THREE.SphereGeometry(0.047, 16, 12), black, 0, 0.004, 0, a);
-      kidPart(new THREE.CylinderGeometry(0.047, 0.051, 0.1, 16, 1, true), black, 0, -0.045, 0, a).material.side = THREE.DoubleSide;
-      kidPart(new THREE.TorusGeometry(0.0505, 0.0045, 6, 20), black, 0, -0.095, 0, a).rotation.x = Math.PI / 2;
-    });
-    // Pantaloneta: tela de gabardina frambuesa con pretina, bolsas en diagonal, costura del centro y el ruedo doblado
-    const shortsTex = tex(256, 128, (g, w, h, r) => {
-      g.fillStyle = '#B04F6E'; g.fillRect(0, 0, w, h);
-      g.strokeStyle = 'rgba(80,20,40,.12)'; g.lineWidth = 1;
-      for (let i = -h; i < w; i += 4) { g.beginPath(); g.moveTo(i, h); g.lineTo(i + h, 0); g.stroke(); }
-      speckle(g, w, h, r, 900, ['rgba(255,255,255,.05)', 'rgba(60,10,30,.08)'], [1, 2]);
-      g.strokeStyle = 'rgba(70,15,35,.45)'; g.lineWidth = 2;
-      [[40, 1], [216, -1]].forEach(([x, s]) => { g.beginPath(); g.moveTo(x, 10); g.lineTo(x + s * 22, 60); g.stroke(); });
-      g.beginPath(); g.moveTo(1, 8); g.lineTo(1, 70); g.moveTo(w - 1, 8); g.lineTo(w - 1, 70); g.stroke();
-      g.fillStyle = 'rgba(70,15,35,.25)'; g.fillRect(0, 0, w, 9);
-    }, 43);
-    const shortsM = kidMat(0xffffff, { map: shortsTex, roughness: .9 }), cuffM = kidMat(0xC05E7D, { roughness: .9 });
-    kidPart(lathe([[0.121, 0.44], [0.124, 0.47], [0.124, 0.5], [0.122, 0.53], [0.119, 0.56], [0.117, 0.585]], 36), shortsM, 0, 0, 0, body).scale.z = 0.7;
-    legs.forEach(l => {
-      kidPart(new THREE.CylinderGeometry(0.066, 0.066, 0.19, 16, 1, true), shortsM, 0, -0.065, 0, l).material.side = THREE.DoubleSide;
-      kidPart(new THREE.TorusGeometry(0.066, 0.011, 8, 22), cuffM, 0, -0.158, 0, l).rotation.x = Math.PI / 2;
-    });
+    franco.outfits = {
+      casual: outfit(() => {
+        // Camiseta: tronco con forma de niño (pancita incluida), costuras a los lados, ruedo pespunteado y la carita del pecho.
+        // Se gira media vuelta para que el centro del lienzo quede adelante; un poco a la derecha del centro es la izquierda de él
+        const shirtTex = tex(512, 256, (g, w, h, r) => {
+          g.fillStyle = '#1E2023'; g.fillRect(0, 0, w, h);
+          speckle(g, w, h, r, 2600, ['rgba(255,255,255,.035)', 'rgba(0,0,0,.2)'], [1, 2]);
+          g.fillStyle = 'rgba(255,255,255,.07)'; [128, 384].forEach(x => g.fillRect(x - 1, 0, 2, h));
+          g.strokeStyle = 'rgba(255,255,255,.12)'; g.setLineDash([4, 4]); g.lineWidth = 1.5;
+          g.beginPath(); g.moveTo(0, h - 9); g.lineTo(w, h - 9); g.stroke(); g.setLineDash([]);
+          const cx = 268, cy = 96; g.strokeStyle = g.fillStyle = '#F2F0EA'; g.lineWidth = 3.4;
+          g.beginPath(); g.ellipse(cx, cy, 19, 15, 0, 0, Math.PI * 2); g.stroke();
+          [-7, 7].forEach(dx => { g.beginPath(); g.ellipse(cx + dx, cy - 4, 2.3, 3.4, 0, 0, Math.PI * 2); g.fill(); });
+          g.beginPath(); g.ellipse(cx, cy + 1, 10, 7.5, 0, 0.12 * Math.PI, 0.88 * Math.PI); g.stroke();
+        }, 41);
+        shirtTex.wrapT = THREE.ClampToEdgeWrapping;
+        const shirtM = kidMat(0xffffff, { map: shirtTex, roughness: .92 }), black = kidMat(0x222428, { roughness: .92 });
+        const torso = kidPart(lathe([[0.129, 0.5], [0.125, 0.53], [0.121, 0.56], [0.122, 0.59], [0.124, 0.62], [0.125, 0.65], [0.125, 0.68],
+          [0.124, 0.71], [0.122, 0.74], [0.12, 0.77], [0.116, 0.8], [0.105, 0.83], [0.085, 0.855], [0.06, 0.873], [0.046, 0.884]], 44), shirtM, 0, 0, 0, body);
+        torso.rotation.y = Math.PI; torso.scale.z = 0.74;
+        const collar = kidPart(new THREE.TorusGeometry(0.045, 0.0075, 8, 28), black, 0, 0.879, 0, body);          // cuello redondo
+        collar.rotation.x = Math.PI / 2; collar.scale.y = 0.8;
+        arms.forEach(a => {                                                 // manga corta con su ruedo
+          kidPart(new THREE.SphereGeometry(0.047, 16, 12), black, 0, 0.004, 0, a);
+          kidPart(new THREE.CylinderGeometry(0.047, 0.051, 0.1, 16, 1, true), black, 0, -0.045, 0, a).material.side = THREE.DoubleSide;
+          kidPart(new THREE.TorusGeometry(0.0505, 0.0045, 6, 20), black, 0, -0.095, 0, a).rotation.x = Math.PI / 2;
+        });
+        // Pantaloneta: tela de gabardina frambuesa con pretina, bolsas en diagonal, costura del centro y el ruedo doblado
+        const shortsTex = tex(256, 128, (g, w, h, r) => {
+          g.fillStyle = '#B04F6E'; g.fillRect(0, 0, w, h);
+          g.strokeStyle = 'rgba(80,20,40,.12)'; g.lineWidth = 1;
+          for (let i = -h; i < w; i += 4) { g.beginPath(); g.moveTo(i, h); g.lineTo(i + h, 0); g.stroke(); }
+          speckle(g, w, h, r, 900, ['rgba(255,255,255,.05)', 'rgba(60,10,30,.08)'], [1, 2]);
+          g.strokeStyle = 'rgba(70,15,35,.45)'; g.lineWidth = 2;
+          [[40, 1], [216, -1]].forEach(([x, s]) => { g.beginPath(); g.moveTo(x, 10); g.lineTo(x + s * 22, 60); g.stroke(); });
+          g.beginPath(); g.moveTo(1, 8); g.lineTo(1, 70); g.moveTo(w - 1, 8); g.lineTo(w - 1, 70); g.stroke();
+          g.fillStyle = 'rgba(70,15,35,.25)'; g.fillRect(0, 0, w, 9);
+        }, 43);
+        const shortsM = kidMat(0xffffff, { map: shortsTex, roughness: .9 }), cuffM = kidMat(0xC05E7D, { roughness: .9 });
+        kidPart(lathe([[0.121, 0.44], [0.124, 0.47], [0.124, 0.5], [0.122, 0.53], [0.119, 0.56], [0.117, 0.585]], 36), shortsM, 0, 0, 0, body).scale.z = 0.7;
+        legs.forEach(l => {
+          kidPart(new THREE.CylinderGeometry(0.066, 0.066, 0.19, 16, 1, true), shortsM, 0, -0.065, 0, l).material.side = THREE.DoubleSide;
+          kidPart(new THREE.TorusGeometry(0.066, 0.011, 8, 22), cuffM, 0, -0.158, 0, l).rotation.x = Math.PI / 2;
+        });
+      }),
+      // Traje de policía (foto ../Franco1.jpg): camisa azul marino de manga larga con cuello, charreteras, botones dorados, dos
+      // bolsas con tapa, el parche de POLICÍA y una estrella; pantalón azul marino, y la gorra de plato con visera negra,
+      // cordón dorado y placa plateada, montada sobre los rizos. Los tenis grises son los mismos (en la foto también)
+      policia: outfit(() => {
+        const navy = kidMat(0x1F2B4D, { roughness: .8 }), gold = kidMat(0xD4A93A, { roughness: .3, metalness: .6 }), shiny = kidMat(0x14161A, { roughness: .15, metalness: .3 });
+        const pTex = tex(512, 256, (g, w, h, r) => {
+          g.fillStyle = '#1F2B4D'; g.fillRect(0, 0, w, h);
+          speckle(g, w, h, r, 2200, ['rgba(255,255,255,.04)', 'rgba(0,0,0,.15)'], [1, 2]);
+          g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(252, 0, 8, h);                                    // tapeta de los botones
+          [34, 90, 146, 202].forEach(y => {
+            g.fillStyle = '#D4A93A'; g.beginPath(); g.arc(256, y, 4.6, 0, 6.3); g.fill();
+            g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(255, y - 1.5, 1.4, 0, 6.3); g.fill();
+          });
+          [204, 308].forEach(x => {                                                                     // bolsas con tapa y botón
+            g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 2; g.strokeRect(x - 22, 62, 44, 50);
+            g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x - 23, 60, 46, 16);
+            g.fillStyle = '#D4A93A'; g.beginPath(); g.arc(x, 72, 3.6, 0, 6.3); g.fill();
+          });
+          g.fillStyle = '#F2F2F2'; g.fillRect(282, 40, 52, 13);                                          // parche, sobre la bolsa izquierda
+          g.fillStyle = '#111'; g.font = '700 10px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('POLICÍA', 308, 47);
+          g.fillStyle = '#E2B43C'; star(g, 320, 26, 8);
+        }, 71);
+        pTex.wrapT = THREE.ClampToEdgeWrapping;
+        const shirt = kidPart(lathe([[0.13, 0.49], [0.126, 0.52], [0.122, 0.55], [0.122, 0.59], [0.124, 0.62], [0.125, 0.65], [0.125, 0.68],
+          [0.124, 0.71], [0.122, 0.74], [0.12, 0.77], [0.116, 0.8], [0.105, 0.83], [0.085, 0.855], [0.06, 0.873], [0.046, 0.884]], 44),
+          kidMat(0xffffff, { map: pTex, roughness: .8 }), 0, 0, 0, body);
+        shirt.rotation.y = Math.PI; shirt.scale.z = 0.75;
+        const band = kidPart(new THREE.TorusGeometry(0.047, 0.009, 8, 28), navy, 0, 0.879, 0, body); band.rotation.x = Math.PI / 2; band.scale.y = 0.8;
+        [-1, 1].forEach(s => {
+          const c = kidPart(new THREE.BoxGeometry(0.045, 0.004, 0.034), navy, s * 0.024, 0.866, 0.07, body); c.rotation.set(-0.5, 0, s * 0.45);   // puntas del cuello
+          const e = kidPart(new THREE.BoxGeometry(0.055, 0.008, 0.032), navy, s * 0.1, 0.842, 0, body); e.rotation.z = -s * 0.38;             // charreteras
+          kidPart(new THREE.SphereGeometry(0.005, 8, 6), gold, s * 0.075, 0.851, 0, body);
+        });
+        arms.forEach((a, i) => {                                           // manga larga, con el codo que se dobla
+          kidPart(new THREE.SphereGeometry(0.047, 16, 12), navy, 0, 0.004, 0, a);
+          kidPart(new THREE.CylinderGeometry(0.047, 0.044, 0.18, 16, 1, true), navy, 0, -0.085, 0, a).material.side = THREE.DoubleSide;
+          const el = franco.elbows[i];
+          kidPart(new THREE.SphereGeometry(0.043, 14, 10), navy, 0, 0, 0, el);
+          kidPart(new THREE.CylinderGeometry(0.043, 0.036, 0.14, 16, 1, true), navy, 0, -0.07, 0, el);
+          kidPart(new THREE.TorusGeometry(0.036, 0.005, 6, 18), navy, 0, -0.14, 0, el).rotation.x = Math.PI / 2;
+          if (i === 1) kidPart(new THREE.BoxGeometry(0.004, 0.045, 0.034), kidMat(0x9EA9B8, { roughness: .4, metalness: .5 }), 0.047, -0.06, 0, a);   // escudo en la manga izquierda
+        });
+        kidPart(lathe([[0.121, 0.44], [0.124, 0.47], [0.124, 0.5], [0.122, 0.53], [0.119, 0.56], [0.117, 0.585]], 36), navy, 0, 0, 0, body).scale.z = 0.7;
+        legs.forEach((l, i) => {                                           // pantalón largo, con la rodilla que se dobla
+          kidPart(new THREE.CylinderGeometry(0.066, 0.062, 0.24, 16, 1, true), navy, 0, -0.115, 0, l).material.side = THREE.DoubleSide;
+          const kn = franco.knees[i];
+          kidPart(new THREE.SphereGeometry(0.061, 14, 10), navy, 0, 0, 0, kn);
+          kidPart(new THREE.CylinderGeometry(0.061, 0.056, 0.215, 16, 1, true), navy, 0, -0.105, 0, kn).material.side = THREE.DoubleSide;
+        });
+        // Gorra de plato: banda, copa ancha y plana, visera negra brillante, cordón dorado y placa plateada al frente
+        const cap = new THREE.Group(); cap.position.set(0, 0.15, 0.012); cap.rotation.x = -0.14; head.add(cap);
+        kidPart(new THREE.CylinderGeometry(0.108, 0.106, 0.045, 32), navy, 0, 0, 0, cap);
+        kidPart(new THREE.CylinderGeometry(0.135, 0.112, 0.04, 32), navy, 0, 0.042, 0, cap);
+        kidPart(new THREE.CylinderGeometry(0.135, 0.135, 0.006, 32), navy, 0, 0.064, 0, cap);
+        const visor = kidPart(new THREE.CylinderGeometry(0.1, 0.1, 0.006, 24, 1, false, -Math.PI / 2, Math.PI), shiny, 0, -0.02, 0.04, cap);
+        visor.rotation.x = 0.35; visor.scale.z = 0.75;
+        kidPart(new THREE.TorusGeometry(0.109, 0.004, 6, 32), gold, 0, 0.005, 0, cap).rotation.x = Math.PI / 2;
+        kidPart(new THREE.BoxGeometry(0.03, 0.036, 0.006), kidMat(0xC8CDD3, { roughness: .25, metalness: .8 }), 0, 0.04, 0.125, cap).rotation.x = -0.25;
+      }),
+    };
+    setOutfit(franco, 'casual');
     feet.forEach(f => sneaker(f, { sole: 0xF1F1EE, upper: 0x5E646B, panel: 0x858B92, toe: 0x6A7078, accent: 0x2F7FD1 }));
     // Pelo rizado: un relleno oscuro pegado a la cabeza, encima cientos de rulitos (argollas y bolitas) que se aclaran hacia
     // afuera, y unos rulos sueltos que caen en la frente, a los lados y en la nuca
@@ -2573,31 +2677,44 @@
   const alayna = kidRig('Alayna', 0xD8A07A, 1.02);
   {
     const { body, head, arms, feet } = alayna;
-    kidPart(headGeo(0.0068), std({ map: faceTex('#D8A07A', 'rgba(214,100,96,.4)', (g, soft) => {
+    // La cara en tres ánimos (express): normal (su sonrisa grande), feliz (se ríe con la boca abierta) y sorpresa
+    const face = mood => faceTex('#D8A07A', 'rgba(214,100,96,.4)', (g, soft) => {
+      const up = mood === 'sorpresa' ? 0.006 : 0;
       [-1, 1].forEach(s => {
-        brow(g, s, 0.036, 0.045, 48, 9, '#24150E', 4.2, 31);           // cejas oscuras y arqueadas
+        brow(g, s, 0.036, 0.045 + up, 48, mood === 'sorpresa' ? 12 : 9, '#24150E', 4.2, 31);   // cejas oscuras y arqueadas
+        if (mood === 'sorpresa') return;
         const [dx, dy] = facePx(s * 0.047, -0.05); g.strokeStyle = 'rgba(120,55,40,.35)'; g.lineWidth = 2.5;   // hoyuelos
         g.beginPath(); g.arc(dx, dy, 5, s > 0 ? 2.2 : -0.3, s > 0 ? 3.4 : 0.9); g.stroke();
       });
-      // Sonrisa grande: los dientes de arriba, la lengua al fondo, el labio de arriba con el arco de cupido y el de abajo lleno
       const [mx, my] = facePx(0, -0.047);
       soft(mx, my + 30, 26, 'rgba(120,50,45,.12)');
-      const mouth = () => { g.beginPath(); g.moveTo(mx - 38, my - 6); g.quadraticCurveTo(mx, my + 2, mx + 38, my - 6);
-        g.quadraticCurveTo(mx + 26, my + 26, mx, my + 27); g.quadraticCurveTo(mx - 26, my + 26, mx - 38, my - 6); };
-      g.fillStyle = '#5E1F1F'; mouth(); g.fill();
-      g.save(); mouth(); g.clip();
-      g.fillStyle = '#FBF8F2'; g.fillRect(mx - 40, my - 8, 80, 16);
-      g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(mx - 40, my + 5, 80, 3);
-      g.strokeStyle = 'rgba(160,150,140,.5)'; g.lineWidth = 1; [-18, -6, 6, 18].forEach(d => { g.beginPath(); g.moveTo(mx + d, my - 6); g.lineTo(mx + d, my + 7); g.stroke(); });
-      g.fillStyle = '#C0615C'; g.beginPath(); g.ellipse(mx, my + 23, 16, 7, 0, 0, Math.PI * 2); g.fill();
-      g.restore();
-      g.fillStyle = '#B45B55'; g.beginPath(); g.moveTo(mx - 39, my - 6); g.quadraticCurveTo(mx - 18, my - 15, mx - 5, my - 12);
-      g.quadraticCurveTo(mx, my - 9, mx + 5, my - 12); g.quadraticCurveTo(mx + 18, my - 15, mx + 39, my - 6); g.quadraticCurveTo(mx, my + 2, mx - 39, my - 6); g.fill();
-      const lg = g.createLinearGradient(0, my + 20, 0, my + 36); lg.addColorStop(0, '#B8625B'); lg.addColorStop(1, '#C97770');
-      g.fillStyle = lg; g.beginPath(); g.moveTo(mx - 26, my + 20); g.quadraticCurveTo(mx, my + 38, mx + 26, my + 20); g.quadraticCurveTo(mx, my + 29, mx - 26, my + 20); g.fill();
-      g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.ellipse(mx + 4, my + 31, 7, 2, 0, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = 'rgba(110,45,40,.45)'; g.lineWidth = 2; [-1, 1].forEach(s => { g.beginPath(); g.arc(mx + s * 41, my - 9, 5, s > 0 ? 1.9 : 0.2, s > 0 ? 2.9 : 1.2); g.stroke(); });
-    }), roughness: .6 }), 0, 0, 0, head);
+      if (mood === 'sorpresa') {
+        g.fillStyle = '#5A1E1E'; g.beginPath(); g.ellipse(mx, my + 8, 11, 14, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = '#C0706A'; g.lineWidth = 5; g.stroke();
+        return;
+      }
+      // Sonrisa grande: los dientes de arriba, la lengua al fondo, el labio de arriba con el arco de cupido y el de abajo
+      // lleno. Feliz, la boca se abre más hacia abajo
+      const deep = mood === 'feliz' ? 9 : 0;
+        const mouth = () => { g.beginPath(); g.moveTo(mx - 38, my - 6); g.quadraticCurveTo(mx, my + 2, mx + 38, my - 6);
+          g.quadraticCurveTo(mx + 26, my + 26 + deep, mx, my + 27 + deep); g.quadraticCurveTo(mx - 26, my + 26 + deep, mx - 38, my - 6); };
+        g.fillStyle = '#5E1F1F'; mouth(); g.fill();
+        g.save(); mouth(); g.clip();
+        g.fillStyle = '#FBF8F2'; g.fillRect(mx - 40, my - 8, 80, 16);
+        g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(mx - 40, my + 5, 80, 3);
+        g.strokeStyle = 'rgba(160,150,140,.5)'; g.lineWidth = 1; [-18, -6, 6, 18].forEach(d => { g.beginPath(); g.moveTo(mx + d, my - 6); g.lineTo(mx + d, my + 7); g.stroke(); });
+        g.fillStyle = '#C0615C'; g.beginPath(); g.ellipse(mx, my + 23 + deep, 16, 7 + deep * 0.4, 0, 0, Math.PI * 2); g.fill();
+        g.restore();
+        g.fillStyle = '#B45B55'; g.beginPath(); g.moveTo(mx - 39, my - 6); g.quadraticCurveTo(mx - 18, my - 15, mx - 5, my - 12);
+        g.quadraticCurveTo(mx, my - 9, mx + 5, my - 12); g.quadraticCurveTo(mx + 18, my - 15, mx + 39, my - 6); g.quadraticCurveTo(mx, my + 2, mx - 39, my - 6); g.fill();
+        const lg = g.createLinearGradient(0, my + 20 + deep, 0, my + 36 + deep); lg.addColorStop(0, '#B8625B'); lg.addColorStop(1, '#C97770');
+        g.fillStyle = lg; g.beginPath(); g.moveTo(mx - 26, my + 20 + deep); g.quadraticCurveTo(mx, my + 38 + deep, mx + 26, my + 20 + deep); g.quadraticCurveTo(mx, my + 29 + deep, mx - 26, my + 20 + deep); g.fill();
+        g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.ellipse(mx + 4, my + 31 + deep, 7, 2, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(110,45,40,.45)'; g.lineWidth = 2; [-1, 1].forEach(s => { g.beginPath(); g.arc(mx + s * 41, my - 9, 5, s > 0 ? 1.9 : 0.2, s > 0 ? 2.9 : 1.2); g.stroke(); });
+    });
+    alayna.faces = { normal: face('normal'), feliz: face('feliz'), sorpresa: face('sorpresa') };
+    alayna.faceMat = std({ map: alayna.faces.normal, roughness: .6 }); alayna.mood = 'normal';
+    kidPart(headGeo(0.0068), alayna.faceMat, 0, 0, 0, head);
     alayna.eyes = [-1, 1].map(s => kidEye(head, s, { iris: 0x2E1B10, skinM: alayna.skinM, lash: 0x120B08, lashW: 0.0016, lashes: true, open: -0.58 }));
     // Cuadritos: franjas celestes a lo largo y a lo ancho, más oscuras donde se cruzan. En el pecho, además, el fruncido
     // (líneas de elástico cada 1.2 cm, con su sombrita)
@@ -2614,40 +2731,44 @@
     };
     // Pecho y hombros en piel, bajo el escote; encima, el cuerpo del vestido fruncido
     kidPart(lathe([[0.1, 0.78], [0.1, 0.81], [0.094, 0.835], [0.076, 0.858], [0.053, 0.876], [0.042, 0.888]], 36), alayna.skinM, 0, 0, 0, body).scale.z = 0.74;
-    kidPart(lathe([[0.114, 0.575], [0.113, 0.61], [0.115, 0.64], [0.118, 0.67], [0.119, 0.7], [0.118, 0.73], [0.115, 0.76], [0.11, 0.79],
-      [0.104, 0.815], [0.099, 0.832]], 44), std({ map: gingham(4, 1.6, true), roughness: .85, side: THREE.DoubleSide }), 0, 0, 0, body).scale.z = 0.76;
-    // Falda fruncida en la cintura: se abre hacia la rodilla y lleva pliegues que crecen hacia el ruedo
-    {
-      const g = lathe([[0.116, 0.588], [0.13, 0.555], [0.148, 0.51], [0.166, 0.46], [0.18, 0.41], [0.19, 0.36], [0.196, 0.325], [0.198, 0.305]], 96);
-      const p = g.attributes.position;
-      for (let i = 0; i < p.count; i++) {
-        const x = p.getX(i), y = p.getY(i), z = p.getZ(i), t = (0.588 - y) / 0.283, k = 1 + 0.075 * t * Math.sin(Math.atan2(x, z) * 16);
-        p.setXYZ(i, x * k, y, z * k);
+    let dressSkirt = null;
+    const dress = outfit(() => {
+      kidPart(lathe([[0.114, 0.575], [0.113, 0.61], [0.115, 0.64], [0.118, 0.67], [0.119, 0.7], [0.118, 0.73], [0.115, 0.76], [0.11, 0.79],
+        [0.104, 0.815], [0.099, 0.832]], 44), std({ map: gingham(4, 1.6, true), roughness: .85, side: THREE.DoubleSide }), 0, 0, 0, body).scale.z = 0.76;
+      // Falda fruncida en la cintura: se abre hacia la rodilla y lleva pliegues que crecen hacia el ruedo
+      {
+        const g = lathe([[0.116, 0.588], [0.13, 0.555], [0.148, 0.51], [0.166, 0.46], [0.18, 0.41], [0.19, 0.36], [0.196, 0.325], [0.198, 0.305]], 96);
+        const p = g.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i), y = p.getY(i), z = p.getZ(i), t = (0.588 - y) / 0.283, k = 1 + 0.075 * t * Math.sin(Math.atan2(x, z) * 16);
+          p.setXYZ(i, x * k, y, z * k);
+        }
+        g.computeVertexNormals();
+        dressSkirt = kidPart(g, std({ map: gingham(9, 2.2), roughness: .85, side: THREE.DoubleSide }), 0, 0, 0, body);
+        dressSkirt.scale.z = 0.86;
       }
-      g.computeVertexNormals();
-      alayna.skirt = kidPart(g, std({ map: gingham(9, 2.2), roughness: .85, side: THREE.DoubleSide }), 0, 0, 0, body);
-      alayna.skirt.scale.z = 0.86;
-    }
-    // Vuelos de encaje calado (bordado inglés): un cono con ondas y agujeritos en flor, sobre cada hombro
-    const eyelet = tex(128, 64, g => {
-      g.fillStyle = '#F4F3F5'; g.fillRect(0, 0, 128, 64);
-      g.globalCompositeOperation = 'destination-out';
-      for (let x = 8; x < 128; x += 16) for (let y = 10; y < 64; y += 22) {
-        const ox = (y / 22 | 0) % 2 ? 8 : 0; g.beginPath(); g.ellipse(x + ox, y, 2.8, 4.2, 0, 0, Math.PI * 2); g.fill();
-        [0, 1, 2, 3, 4].forEach(k => { const a = k * 1.2566; g.beginPath(); g.arc(x + ox + Math.cos(a) * 6, y + Math.sin(a) * 6, 1.5, 0, Math.PI * 2); g.fill(); });
-      }
-    });
-    eyelet.repeat.set(3, 1);
-    const ruffleM = std({ map: eyelet, roughness: .9, side: THREE.DoubleSide, alphaTest: 0.5, transparent: false });
-    arms.forEach(a => {
-      const g = new THREE.CylinderGeometry(0.043, 0.074, 0.075, 48, 2, true), p = g.attributes.position;
-      for (let i = 0; i < p.count; i++) {
-        const x = p.getX(i), z = p.getZ(i), t = (0.0375 - p.getY(i)) / 0.075, k = 1 + 0.12 * t * Math.sin(Math.atan2(x, z) * 9);
-        p.setXYZ(i, x * k, p.getY(i), z * k);
-      }
-      g.computeVertexNormals();
-      kidPart(g, ruffleM, 0, -0.006, 0, a);
-      kidPart(new THREE.TorusGeometry(0.036, 0.009, 6, 18, Math.PI), std({ map: gingham(1, 0.4), roughness: .85 }), 0, 0.006, 0, a).rotation.y = Math.PI / 2;   // tirante
+      // Vuelos de encaje calado (bordado inglés): un cono con ondas y agujeritos en flor, sobre cada hombro
+      const eyelet = tex(128, 64, g => {
+        g.fillStyle = '#F4F3F5'; g.fillRect(0, 0, 128, 64);
+        g.globalCompositeOperation = 'destination-out';
+        for (let x = 8; x < 128; x += 16) for (let y = 10; y < 64; y += 22) {
+          const ox = (y / 22 | 0) % 2 ? 8 : 0; g.beginPath(); g.ellipse(x + ox, y, 2.8, 4.2, 0, 0, Math.PI * 2); g.fill();
+          [0, 1, 2, 3, 4].forEach(k => { const a = k * 1.2566; g.beginPath(); g.arc(x + ox + Math.cos(a) * 6, y + Math.sin(a) * 6, 1.5, 0, Math.PI * 2); g.fill(); });
+        }
+      });
+      eyelet.repeat.set(3, 1);
+      const ruffleM = std({ map: eyelet, roughness: .9, side: THREE.DoubleSide, alphaTest: 0.5, transparent: false });
+      arms.forEach(a => {
+        const g = new THREE.CylinderGeometry(0.043, 0.074, 0.075, 48, 2, true), p = g.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i), z = p.getZ(i), t = (0.0375 - p.getY(i)) / 0.075, k = 1 + 0.12 * t * Math.sin(Math.atan2(x, z) * 9);
+          p.setXYZ(i, x * k, p.getY(i), z * k);
+        }
+        g.computeVertexNormals();
+        kidPart(g, ruffleM, 0, -0.006, 0, a);
+        kidPart(new THREE.TorusGeometry(0.036, 0.009, 6, 18, Math.PI), std({ map: gingham(1, 0.4), roughness: .85 }), 0, 0.006, 0, a).rotation.y = Math.PI / 2;   // tirante
+      });
+      return { skirt: dressSkirt };
     });
     // Zapatitos rosados de charol con una tirita sobre el empeine
     feet.forEach(f => {
@@ -2692,21 +2813,79 @@
     alayna.hair = kidPart(mergeGeo(locks), hairMat(), 0, 0, 0, head);
     // Lazo rosado arriba, un poco hacia atrás: dos orejas de satín, otras dos de tul más grandes y transparentes, el nudo y
     // dos puntas que caen
-    const bow = new THREE.Group(); bow.position.set(0, 0.118, -0.03); bow.rotation.x = -0.5; head.add(bow);
-    const satin = kidMat(0xE0527A, { roughness: .3, metalness: .1 }), tulle = std({ color: 0xF6A9BF, roughness: .8, transparent: true, opacity: .5, side: THREE.DoubleSide, depthWrite: false });
-    [-1, 1].forEach(s => {
-      const l = kidPart(new THREE.TorusGeometry(0.022, 0.01, 8, 20), satin, s * 0.03, 0, 0, bow); l.scale.set(1.35, 0.9, 0.5); l.rotation.z = s * 0.3;
-      const t = kidPart(new THREE.SphereGeometry(0.036, 14, 10), tulle, s * 0.036, 0.004, -0.004, bow); t.scale.set(1.3, 0.9, 0.5); t.castShadow = false;
-      const tail = kidPart(new THREE.BoxGeometry(0.014, 0.05, 0.003), satin, s * 0.012, -0.03, 0.006, bow); tail.rotation.z = s * 0.35;
+    const bowParts = outfit(() => {
+      const bow = new THREE.Group(); bow.position.set(0, 0.118, -0.03); bow.rotation.x = -0.5; head.add(bow);
+      const satin = kidMat(0xE0527A, { roughness: .3, metalness: .1 }), tulle = std({ color: 0xF6A9BF, roughness: .8, transparent: true, opacity: .5, side: THREE.DoubleSide, depthWrite: false });
+      [-1, 1].forEach(s => {
+        const l = kidPart(new THREE.TorusGeometry(0.022, 0.01, 8, 20), satin, s * 0.03, 0, 0, bow); l.scale.set(1.35, 0.9, 0.5); l.rotation.z = s * 0.3;
+        const t = kidPart(new THREE.SphereGeometry(0.036, 14, 10), tulle, s * 0.036, 0.004, -0.004, bow); t.scale.set(1.3, 0.9, 0.5); t.castShadow = false;
+        const tail = kidPart(new THREE.BoxGeometry(0.014, 0.05, 0.003), satin, s * 0.012, -0.03, 0.006, bow); tail.rotation.z = s * 0.35;
+      });
+      kidPart(new THREE.SphereGeometry(0.014, 12, 10), satin, 0, 0, 0.002, bow).scale.set(1, 1.1, 0.8);
     });
-    kidPart(new THREE.SphereGeometry(0.014, 12, 10), satin, 0, 0, 0.002, bow).scale.set(1, 1.1, 0.8);
+    alayna.outfits = {
+      vestido: { parts: dress.parts.concat(bowParts.parts), skirt: dress.skirt },
+      // Traje de Gabby (foto ../alayna.jpg): camiseta de rayas negras y blancas de manga corta, tutú de tul azul sobre capas de
+      // colores (rojo, morado y azul) con la pretina azul, la diadema de orejitas de gato —blancas, la izquierda negra, con el
+      // adentro rosado brillante— y el bolsito de rayas de colores cruzado
+      gabby: outfit(() => {
+        const stripes = tex(128, 128, g => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#F6F6F2' : '#1C1C1E'; g.fillRect(0, i * 16, 128, 16); } });
+        stripes.repeat.set(1, 2.2);
+        const teeM = kidMat(0xffffff, { map: stripes, roughness: .85 }), blackM = kidMat(0x1C1C1E, { roughness: .8 }), blueM = kidMat(0x2446B8, { roughness: .6 });
+        kidPart(lathe([[0.121, 0.565], [0.12, 0.59], [0.122, 0.62], [0.123, 0.65], [0.123, 0.68], [0.122, 0.71], [0.12, 0.74], [0.118, 0.77],
+          [0.114, 0.8], [0.104, 0.83], [0.084, 0.855], [0.06, 0.873], [0.046, 0.884]], 44), teeM, 0, 0, 0, body).scale.z = 0.76;
+        const trim = kidPart(new THREE.TorusGeometry(0.045, 0.007, 8, 28), blackM, 0, 0.879, 0, body); trim.rotation.x = Math.PI / 2; trim.scale.y = 0.8;
+        arms.forEach(a => {
+          kidPart(new THREE.SphereGeometry(0.046, 16, 12), teeM, 0, 0.004, 0, a);
+          kidPart(new THREE.CylinderGeometry(0.046, 0.05, 0.1, 16, 1, true), teeM, 0, -0.045, 0, a).material.side = THREE.DoubleSide;
+          kidPart(new THREE.TorusGeometry(0.0495, 0.0045, 6, 20), blackM, 0, -0.095, 0, a).rotation.x = Math.PI / 2;
+        });
+        // Tutú: la falda de colores con pliegues y, encima, el tul azul transparente con el ruedo en ondas. Los dos se mecen juntos
+        const tutu = new THREE.Group(); body.add(tutu);
+        const ruffled = (pts, amp, folds) => {
+          const g = lathe(pts, 96), p = g.attributes.position, top = pts[0][1], span = top - pts[pts.length - 1][1];
+          for (let i = 0; i < p.count; i++) {
+            const x = p.getX(i), y = p.getY(i), z = p.getZ(i), t = (top - y) / span, k = 1 + amp * t * Math.sin(Math.atan2(x, z) * folds);
+            p.setXYZ(i, x * k, y, z * k);
+          }
+          g.computeVertexNormals(); return g;
+        };
+        const rainbow = tex(32, 256, g => {
+          const gr = g.createLinearGradient(0, 0, 0, 256);
+          gr.addColorStop(0, '#D93A5B'); gr.addColorStop(0.3, '#B03A8C'); gr.addColorStop(0.55, '#6A3FB0'); gr.addColorStop(0.8, '#2E4FB8'); gr.addColorStop(1, '#3F8FE0');
+          g.fillStyle = gr; g.fillRect(0, 0, 32, 256);
+        });
+        rainbow.wrapT = THREE.ClampToEdgeWrapping;
+        kidPart(ruffled([[0.118, 0.6], [0.15, 0.56], [0.19, 0.5], [0.22, 0.44], [0.235, 0.4], [0.24, 0.38]], 0.08, 18),
+          std({ map: rainbow, roughness: .85, side: THREE.DoubleSide }), 0, 0, 0, tutu).scale.z = 0.86;
+        const tulle = kidPart(ruffled([[0.125, 0.6], [0.165, 0.56], [0.21, 0.49], [0.245, 0.42], [0.262, 0.37], [0.268, 0.35]], 0.12, 13),
+          std({ color: 0x3A7BD5, roughness: .7, transparent: true, opacity: .42, side: THREE.DoubleSide, depthWrite: false }), 0, 0, 0, tutu);
+        tulle.scale.z = 0.86; tulle.castShadow = false;
+        const waist = kidPart(new THREE.TorusGeometry(0.121, 0.012, 8, 36), blueM, 0, 0.598, 0, tutu); waist.rotation.x = Math.PI / 2; waist.scale.y = 0.8;
+        // Diadema con orejitas de gato
+        const white = kidMat(0xF7F7F7, { roughness: .7 }), glitter = kidMat(0xE56FA8, { roughness: .25, metalness: .45, emissive: 0x401028, emissiveIntensity: .4 });
+        const band = kidPart(new THREE.TorusGeometry(0.118, 0.006, 6, 30, Math.PI), white, 0, 0.006, -0.012, head); band.rotation.x = -0.28;
+        [-1, 1].forEach(s => {
+          const ear = kidPart(new THREE.ConeGeometry(0.036, 0.066, 4), s > 0 ? blackM : white, s * 0.066, 0.13, -0.03, head);
+          ear.rotation.set(-0.28, Math.PI / 4, -s * 0.38); ear.scale.z = 0.35;
+          const inner = kidPart(new THREE.ConeGeometry(0.021, 0.042, 3), glitter, s * 0.064, 0.126, -0.019, head);
+          inner.rotation.set(-0.28, 0, -s * 0.38); inner.scale.z = 0.3;
+        });
+        // Bolsito de rayas de colores en la cadera derecha, colgado de una correa azul cruzada desde el hombro izquierdo
+        const stripesBag = tex(64, 64, g => { ['#F4C430', '#E53935', '#26A69A', '#43A047', '#1E88E5', '#F4C430'].forEach((c, i) => { g.fillStyle = c; g.fillRect(0, i * 11, 64, 11); }); });
+        const bag = kidPart(new THREE.BoxGeometry(0.11, 0.12, 0.032), kidMat(0xffffff, { map: stripesBag, roughness: .7 }), -0.13, 0.47, 0.215, body); bag.rotation.set(-0.2, 0.25, 0.12);
+        const strap = kidPart(new THREE.BoxGeometry(0.014, 0.42, 0.006), blueM, -0.012, 0.68, 0.15, body); strap.rotation.set(0.3, 0, -0.62);
+        return { skirt: tutu };
+      }),
+    };
+    setOutfit(alayna, 'vestido');
   }
   const KIDS = { franco, alayna };
   let kid = franco;                                           // el que se está jugando
 
   const FR_R = 0.14;                                          // radio con que choca: los hombros de un niño de 5 años
   const LOOK_H = 1.15;                                        // la cámara mira un poco sobre su cabeza, para que él quede abajo
-  const fr = { on: false, who: 'franco', blinkAt: 0, blinkEnd: 0, jz: 0, jv: 0, waveEnd: 0, speed: 0, pose: null, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
+  const fr = { on: false, who: 'franco', blinkAt: 0, blinkEnd: 0, jz: 0, jv: 0, waveEnd: 0, speed: 0, pose: null, mood: 'normal', moodEnd: 0, bump: 0, spinEnd: 0, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
     wantX: 0, wantY: 0, prev: 'exterior', fly: null, room: '', look: new V3() };
   const clampPitch = p => Math.max(-0.12, Math.min(1.25, p));
   const inHouse = (x, y) => x >= -0.08 && x <= W + 0.08 && y >= -0.08 && y <= D + 0.08;
@@ -3008,6 +3187,9 @@
       }
       const step = mag * (run ? 2.4 : 1.5) * dt;
       walkBy(wx * step, wy * step);
+      // Si camina con ganas y no avanza (se topó con algo), pone cara de sorpresa
+      fr.bump = step > 0.015 && Math.hypot(fr.x - x0, fr.y - y0) < step * 0.3 ? fr.bump + dt : 0;
+      if (fr.bump > 0.15 && t > fr.moodEnd + 1.5) express('sorpresa', 0.9);
       fr.yawT = Math.atan2(fr.wantX, fr.wantY);
     }
     doorsStep(dt);
@@ -3036,7 +3218,10 @@
     kid.head.rotation.x = Math.sin(t * 0.43) * 0.06 * still;
     if (t > fr.blinkAt) { fr.blinkEnd = t + 0.16; fr.blinkAt = t + 2 + Math.random() * 3; }
     const blink = t < fr.blinkEnd ? 1 - Math.abs((fr.blinkEnd - t) / 0.08 - 1) : 0;   // baja y sube el párpado
-    kid.eyes.forEach(e => { e.lid.rotation.x = e.open + 2.0 * blink; });
+    // Ánimo: el que pidió express mientras dura; si no, feliz corriendo y normal lo demás. Feliz achina los ojos; sorpresa los abre
+    const mood = t < fr.moodEnd ? fr.mood : fr.speed > 2.0 ? 'feliz' : 'normal';
+    if (kid.mood !== mood) { kid.mood = mood; kid.faceMat.map = kid.faces[mood]; }
+    kid.eyes.forEach(e => { e.lid.rotation.x = e.open + (mood === 'feliz' ? 0.45 : mood === 'sorpresa' ? -0.12 : 0) + 2.0 * blink; });
     if (kid.skirt) { kid.skirt.rotation.x = -0.05 * A + Math.sin(ph * 2) * 0.025 * A; kid.skirt.rotation.z = sn * 0.03 * A; }
     if (kid.hair) kid.hair.rotation.x = 0.06 * A + Math.sin(ph * 2) * 0.012 * A;
     // Salto: sube a 3 m/s y cae con la gravedad; en el aire encoge las piernas y sube los brazos
@@ -3052,7 +3237,10 @@
     if (wv) { kid.arms[0].rotation.x = -0.25 * wv; kid.elbows[0].rotation.x = -0.35 * wv; }
     fr.h += (floorAt(fr.x, fr.y) - fr.h) * Math.min(1, dt * 14);
     if (fr.pose) applyPose(t);
-    else { kid.root.position.set(X(fr.x), fr.h + fr.jz, Z(fr.y)); kid.root.rotation.set(0, fr.yaw, 0); }
+    else {
+      const spin = t < fr.spinEnd ? (1 - (fr.spinEnd - t) / 0.7) * Math.PI * 2 : 0;   // la vueltita al cambiarse de ropa
+      kid.root.position.set(X(fr.x), fr.h + fr.jz, Z(fr.y)); kid.root.rotation.set(0, fr.yaw + spin, 0);
+    }
     const room = roomAt(fr.x, fr.y);
     if (room !== fr.room) { fr.room = room; roomEl.textContent = room; }
 
@@ -3447,20 +3635,32 @@
   const nearRect = (x0, x1, y0, y1) => (x, y) => Math.hypot(x - Math.max(x0, Math.min(x, x1)), y - Math.max(y0, Math.min(y, y1)));
   const nearPoint = (px, py) => (x, y) => Math.hypot(x - px, y - py);
   const THINGS = [
-    ...[4.49, 5.55].map(y => ({ d: nearPoint(4.75, y), r: 0.7, label: () => 'Sentarse',
+    ...[4.49, 5.55].map(y => ({ d: nearPoint(4.75, y), r: 0.7, label: () => 'Sentarse', icon: () => 'sit',
       act: () => startPose({ kind: 'sit', hx: 5.4, hy: y, cx: 4.9, cy: y, seat: 0.52, face: -Math.PI / 2, look: 0.95 }) })),
-    { d: nearRect(0.96, 2.96, 0.04, 1.56), r: 0.45, label: () => 'Acostarse',
+    { d: nearRect(0.96, 2.96, 0.04, 1.56), r: 0.45, label: () => 'Acostarse', icon: () => 'bed',
       act: () => startPose({ kind: 'lie', hx: 2.64, hy: 0.8, dx: 1, dy: 0, psi: -Math.PI / 2, top: 0.53, cx: 1.95, cy: 0.8, look: 0.75 }) },
-    { d: nearRect(0.04, 2.04, 4.04, 5.56), r: 0.45, label: () => 'Acostarse',
+    { d: nearRect(0.04, 2.04, 4.04, 5.56), r: 0.45, label: () => 'Acostarse', icon: () => 'bed',
       act: () => startPose({ kind: 'lie', hx: 0.36, hy: 4.8, dx: -1, dy: 0, psi: Math.PI / 2, top: 0.53, cx: 1.2, cy: 4.8, look: 0.75 }) },
-    ...SWITCHES.map(sw => ({ d: nearPoint(...sw.reach), r: 0.55, label: () => sw.lights.some(lit) ? 'Apagar la luz' : 'Prender la luz', act: () => toggleSwitch(sw) })),
-    { d: nearPoint(4.9, 2.25), r: 0.6, label: () => FRIDGE.target ? 'Cerrar la refri' : 'Abrir la refri',
+    ...SWITCHES.map(sw => ({ d: nearPoint(...sw.reach), r: 0.55, label: () => sw.lights.some(lit) ? 'Apagar la luz' : 'Prender la luz',
+      icon: () => sw.lights.some(lit) ? 'bulbOff' : 'bulbOn', act: () => toggleSwitch(sw) })),
+    { d: nearPoint(4.9, 2.25), r: 0.6, label: () => FRIDGE.target ? 'Cerrar la refri' : 'Abrir la refri', icon: () => 'fridge',
       act: () => { FRIDGE.target = FRIDGE.target ? 0 : 1; doorSound(FRIDGE.target ? 'open' : 'close', 1.5); } },
-    { d: nearPoint(5.42, -0.85), r: 0.6, label: () => TAP.open ? 'Cerrar la llave' : 'Abrir la llave',
+    { d: nearPoint(5.42, -0.85), r: 0.6, label: () => TAP.open ? 'Cerrar la llave' : 'Abrir la llave', icon: () => 'tap',
       act: () => { TAP.open = !TAP.open; TAP.stream.visible = TAP.open; waterSound(TAP.open); clickSound(); } },
   ];
+  // Íconos de las acciones de cerca (trazos en una caja de 24 × 24)
+  const ICONS = {
+    sit: '<path d="M6 11V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/><path d="M4 11h16a1 1 0 0 1 1 1v4H3v-4a1 1 0 0 1 1-1zM5 16v3M19 16v3"/>',
+    bed: '<path d="M3 7v12M3 16h18v3M21 16v-3a3 3 0 0 0-3-3h-7v6"/><circle cx="7" cy="12.5" r="1.8"/><path d="M15 3h3l-3 3.5h3"/>',
+    up: '<circle cx="12" cy="4.5" r="2"/><path d="M12 7.5v7M8 10.5l4-3 4 3M9.5 21l2.5-6.5 2.5 6.5"/>',
+    bulbOn: '<path d="M9 18h6M10 21h4M12 5a5 5 0 0 0-3 9c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a5 5 0 0 0-3-9zM12 1v1.3M4.6 3.6l.9.9M19.4 3.6l-.9.9M2.3 10h1.3M20.4 10h1.3"/>',
+    bulbOff: '<path d="M9 18h6M10 21h4M12 5a5 5 0 0 0-3 9c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a5 5 0 0 0-3-9zM4 3l16 16"/>',
+    fridge: '<rect x="6" y="2.5" width="12" height="19" rx="1.5"/><path d="M6 10h12M9 5.5v2.5M9 12.5v4"/>',
+    tap: '<path d="M3 9h8a4 4 0 0 1 4 4v1M3 6.5v5M8 5h3M9.5 5v4M15 16.5s-1.8 2-1.8 3.1a1.8 1.8 0 0 0 3.6 0c0-1.1-1.8-3.1-1.8-3.1z"/>',
+    shirt: '<path d="M8.5 3.5 4 6l1.8 3.6L8 8.6V20h8V8.6l2.2 1 1.8-3.6-4.5-2.5a3.5 3.5 0 0 1-7 0z"/>',
+  };
   const ctxBtn = $('#act-ctx');
-  let ctxThing = null;
+  let ctxThing = null, ctxIcon = '';
   function useCtx() {
     if (!fr.on) return;
     if (fr.pose) { endPose(); return; }
@@ -3478,8 +3678,9 @@
     let best = null, bd = 1e9;
     if (!fr.pose) THINGS.forEach(th => { const d = th.d(fr.x, fr.y); if (d < th.r && d < bd) { bd = d; best = th; } });
     ctxThing = best;
-    const label = fr.pose ? 'Levantarse' : best ? best.label() : '';
-    if (ctxBtn.textContent !== label) ctxBtn.textContent = label;
+    const label = fr.pose ? 'Levantarse' : best ? best.label() : '', icon = fr.pose ? 'up' : best ? best.icon() : '';
+    if (icon !== ctxIcon) { ctxIcon = icon; ctxBtn.innerHTML = icon ? '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[icon] + '</svg>' : ''; }
+    if (ctxBtn.title !== label) { ctxBtn.title = label; ctxBtn.setAttribute('aria-label', label); }
     ctxBtn.hidden = !label;
     FRIDGE.open += (FRIDGE.target - FRIDGE.open) * Math.min(1, dt * 5);
     FRIDGE.door.rotation.y = -1.9 * FRIDGE.open; FRIDGE.inner.emissiveIntensity = 0.55 * FRIDGE.open; FRIDGE.light.intensity = 0.7 * FRIDGE.open;
@@ -3515,7 +3716,24 @@
       padPrev[i] = on;
     });
   }
-  let express = () => {};                                     // caras: se definen con los personajes
+  // Cara que pone el niño por un rato: 'feliz' (patea, salta, saluda, se cambia de ropa) o 'sorpresa' (se topa con algo)
+  function express(mood, dur) { fr.mood = mood; fr.moodEnd = performance.now() / 1000 + dur; }
+  // Cambiarse de ropa en el ropero: la muda siguiente, con una vueltita, un tintineo y cara feliz
+  const OUTFIT_NAME = { casual: 'la camiseta', policia: 'el traje de policía', vestido: 'el vestido', gabby: 'el traje de Gabby' };
+  const nextOutfit = () => { const n = Object.keys(kid.outfits); return n[(n.indexOf(kid.outfitName) + 1) % n.length]; };
+  function chime() {
+    if (!sfxOk()) return;
+    const { ctx } = MUSIC, t = ctx.currentTime + 0.01;
+    [84, 88, 91, 96].forEach((m, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), t0 = t + i * 0.07;
+      o.frequency.value = midiHz(m); g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.12, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
+      o.connect(g); g.connect(MUSIC.fx); o.start(t0); o.stop(t0 + 0.55);
+    });
+  }
+  function changeOutfit() { setOutfit(kid, nextOutfit()); fr.spinEnd = performance.now() / 1000 + 0.7; chime(); express('feliz', 1.5); }
+  THINGS.push(
+    { d: nearPoint(0.95, 1.85), r: 0.5, label: () => 'Ponerse ' + OUTFIT_NAME[nextOutfit()], icon: () => 'shirt', act: changeOutfit },   // ropero del dormitorio 1
+    { d: nearPoint(2.26, 6.05), r: 0.45, label: () => 'Ponerse ' + OUTFIT_NAME[nextOutfit()], icon: () => 'shirt', act: changeOutfit });  // ropero del dormitorio 2
 
   const hud = $('#play-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof'), swapBtn = $('#fh-swap');
   const playBtn = $('#v-play'), playMenu = $('#play-menu');
