@@ -232,7 +232,7 @@
     <div class="extra"><dt>Columnas</dt><dd>31<small>de 3.20 m</small></dd></div>
     <div class="extra"><dt>Lote</dt><dd>212<small>m²</small></dd></div>
     <div class="extra"><dt>Frente lote</dt><dd>7.98<small>m</small></dd></div>
-    <div class="extra"><dt>Al vecino</dt><dd id="lot-gap">2.50<small>m</small></dd></div>
+    <div class="extra"><dt>Al vecino</dt><dd id="lot-gap">2.48<small>m</small></dd></div>
   </dl>
   <details class="spaces" id="spaces" open>
     <summary><span class="sec-h">Espacios</span><span class="sum-note">medidas a ejes</span><i class="chev"></i></summary>
@@ -920,9 +920,11 @@
      - BOQ, medido a lo largo de la colindancia 4-1 desde la calle: depth, fondo libre del boquete del lado derecho, que es el más
        corto porque la calle va sesgada (la dueña midió un garaje de 4.50 m donde un carro cabía bien); wall, grueso del muro de
        contención de atrás; gap, del muro al frente de la casa, para el talón del muro, el desagüe y conectar después la losa.
+       La dueña pidió el 2026-09-21 que la casa arrancara a 6.00 m de la calle por el lado más cercano, así que gap bajó de 1.00
+       a 0.80: el garaje conserva los 5.00 m de fondo que ella midió y lo que se recorta es la franja del frente.
        fall: pendiente del piso del boquete hacia la calle, para que escurra.
      - front: del vértice 1 al frente de la casa (borde de la losa del corredor), a lo largo de la colindancia 4-1 */
-  const BOQ = { depth: 5.0, wall: 0.2, gap: 1.0, fall: 0.015 };
+  const BOQ = { depth: 5.0, wall: 0.2, gap: 0.8, fall: 0.015 };
   const SITE = { front: BOQ.depth + BOQ.wall + BOQ.gap, side: 0.15 };
   {
     const dx = W / 2 + OVS + 0.05 + SITE.side - LOT[0][0], dz = Z(D + 0.08) + SITE.front - LOT[0][1];
