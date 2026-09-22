@@ -1422,7 +1422,7 @@
   const nbGlass = std({ color: 0xE4E6E3, roughness: .7, emissive: 0xffc37d, emissiveIntensity: 0 });   // cortinas claras, como en las fotos
   /* Keylin chismeando (pedido de la dueña, 2026-09-21, con el permiso de Keylin): se asoma por la ventana izquierda del frente
      de la casa del vecino de la derecha vista desde la calle, la del lado de este lote, detrás de una cortina: sale, se queda
-     viendo hacia nuestra casa con la cabeza de lado y se vuelve a esconder, cada 9 s. Su foto va aquí mismo (recortada a la cara
+     viendo hacia nuestra casa con la cara inclinada y se vuelve a esconder, cada 9 s. Solo aparece en el juego. Su foto va aquí mismo (recortada a la cara
      y los hombros, 240 × 286), con los bordes difuminados en óvalo; así la página sigue abriendo sin internet. keylinWindow la
      pone en la ventana (la llama la casa de la derecha, más abajo): el cuarto oscuro, ella y la cortina, pegados al vidrio y
      detrás del marco. Primero se puso en la casa de la izquierda, que no era */
@@ -1453,14 +1453,18 @@
       cg.computeVertexNormals();
       const cur = new THREE.Mesh(cg, std({ color: 0xE6D8C2, roughness: .95, side: THREE.DoubleSide }));
       cur.position.set(-ko * cw / 2, 0, 0.011); cur.castShadow = false; w.add(cur);
-      kp.position.set(-ko * 0.25, 0.2, 0.006); w.add(kp);
-      // Sale de detrás de la cortina (0.6 s), se queda viendo 3.5 s con la cabeza de lado y se esconde (0.5 s)
+      // Gira desde abajo (como si se ladeara desde el cuerpo, escondido detrás de la cortina): así la cara sale inclinada
+      const piv = new THREE.Group(); piv.position.set(-ko * 0.25, -0.04, 0.006); w.add(piv);
+      kp.position.set(0, 0.24, 0); piv.add(kp);
+      // Solo en el juego (pedido de la dueña): sale de detrás de la cortina ladeándose (0.6 s), se queda viendo 3.5 s con la
+      // cara inclinada y se vuelve a esconder (0.5 s)
       keylinStep = t => {
-        if (!neighbors.visible) return;
+        kp.visible = fr.on && neighbors.visible;
+        if (!kp.visible) return;
         const c = (t / 1000) % 9, out = reduceMotion ? 1 : c < 0.6 ? smooth(0, 0.6, c) : c < 4.1 ? 1 : c < 4.6 ? 1 - smooth(4.1, 4.6, c) : 0;
-        kp.position.x = ko * (-0.25 + 0.38 * out);
-        kp.rotation.z = -ko * (0.1 + 0.04 * Math.sin(t / 600)) * out;
-        kp.position.y = 0.2 + 0.01 * Math.sin(t / 450) * out;
+        piv.position.x = ko * (-0.25 + 0.2 * out);
+        piv.rotation.z = -ko * (0.42 + 0.05 * Math.sin(t / 600)) * out;
+        piv.position.y = -0.04 + 0.01 * Math.sin(t / 450) * out;
       };
     };
   }
