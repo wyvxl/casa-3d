@@ -527,7 +527,7 @@
       <button type="button" class="act act-main" id="act-jump" title="Saltar (espacio)" aria-label="Saltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V5M6.5 10.5 12 5l5.5 5.5M5 21h14"/></svg></button>
     </div>
   </div>
-  <p class="fh-keys">WASD o flechas: caminar · Shift: correr · Espacio: saltar · Q: saludar · E: usar · P: pelota · F: foto · M: sonido · Esc: salir</p>
+  <p class="fh-keys">WASD o flechas: caminar · Shift: correr · Espacio: saltar · Q: <span id="fh-keys-q">saludar</span> · E: usar · P: pelota · F: foto · M: sonido · Esc: salir</p>
 </div>
 <div class="fallback" id="fallback" hidden><p>No se pudo iniciar el visor 3D. Abre la página en un navegador con WebGL activado (Chrome, Edge, Firefox o Safari recientes).</p></div>
 
@@ -2235,9 +2235,10 @@
        losa y Keylin), lo que lleva datos propios (userData: los pisos de los espacios, el terreno), lo que está escondido
        (el agua de la pila) y lo transparente (vidrios), que se tiene que ordenar pieza por pieza */
   const BAKE_ROOTS = [house, roof, site, today, boqG, losaG, losaRoof, frontPad, neighbors, extraNow, extraBoq, ...furn.children];
-  const bakeable = c => {
+  // kid: las piezas de los niños, que traen userData.noPick (packKid)
+  const bakeable = (c, kid) => {
     const mats = Array.isArray(c.material) ? c.material : [c.material], g = c.geometry;
-    return c.isMesh && !c.isInstancedMesh && !c.isSkinnedMesh && !Object.keys(c.userData).length && g && g.isBufferGeometry &&
+    return c.isMesh && !c.isInstancedMesh && !c.isSkinnedMesh && Object.keys(c.userData).every(k => kid && k === 'noPick') && g && g.isBufferGeometry &&
       !Object.keys(g.morphAttributes).length && g.drawRange.start === 0 && g.drawRange.count === Infinity &&
       Object.values(g.attributes).every(a => a.isBufferAttribute && a.array instanceof Float32Array && !a.normalized) &&
       mats.every(m => m && !m.transparent) && (!Array.isArray(c.material) || g.groups.length > 0);
@@ -3757,12 +3758,71 @@
     m.steam = steam;
     return m;
   }
+  /* Piezas de cada niño juntas (2026-09-22): cada niño eran de 75 a 100 piezas sueltas —cada dedo, pestaña, cordón y botón—, el
+     doble con su sombra: casi un tercio de las llamadas de dibujo del juego, y Maritza la que más. Como bake, pero hueso por
+     hueso: dentro de cada grupo (la cabeza, cada brazo, codo, pierna, rodilla, pie, párpado...) se juntan las piezas del mismo
+     material, cada muda por su lado para que setOutfit las siga prendiendo y apagando. Se mueven igual porque siguen colgando
+     del mismo hueso. No se juntan el pelo ni la falda (se mecen solos), lo transparente ni lo que tiene piezas colgando.
+     A diferencia de bake, guarda el índice: así cada vértice se calcula una vez y no una por triángulo */
+  function joinParts(list) {
+    const names = Object.keys(list[0].geometry.attributes), data = names.map(() => []), idx = [], v = new V3(), nm = new THREE.Matrix3();
+    let off = 0;
+    list.forEach(c => {
+      const g = c.geometry, m = c.matrix, n = g.attributes.position.count, flip = m.determinant() < 0;   // un espejo voltea las caras
+      nm.getNormalMatrix(m);
+      names.forEach((a, k) => {
+        const src = g.attributes[a], out = data[k];
+        for (let i = 0; i < n; i++) {
+          if (a === 'position' || a === 'normal') {
+            v.fromBufferAttribute(src, i);
+            if (a === 'position') v.applyMatrix4(m); else v.applyMatrix3(nm).normalize();
+            out.push(v.x, v.y, v.z);
+          } else for (let j = 0; j < src.itemSize; j++) out.push(src.array[i * src.itemSize + j]);
+        }
+      });
+      const tri = g.index ? g.index.array : null, count = tri ? tri.length : n;
+      for (let i = 0; i + 2 < count; i += 3) {
+        const a = tri ? tri[i] : i, b = tri ? tri[i + 1] : i + 1, d = tri ? tri[i + 2] : i + 2;
+        idx.push(a + off, (flip ? d : b) + off, (flip ? b : d) + off);
+      }
+      off += n;
+    });
+    const out = new THREE.BufferGeometry();
+    names.forEach((a, k) => out.setAttribute(a, new THREE.Float32BufferAttribute(data[k], list[0].geometry.attributes[a].itemSize)));
+    out.setIndex(idx); return out;
+  }
+  function packKid(k) {
+    const outfits = k.outfits || {}, own = new Map();                       // pieza → la muda a la que pertenece
+    Object.entries(outfits).forEach(([n, o]) => o.parts.forEach(p => own.set(p, n)));
+    const keep = new Set([k.hair, k.skirt, ...Object.values(outfits).map(o => o.skirt)]);
+    k.root.updateMatrixWorld(true);
+    const nodes = []; k.root.traverse(o => nodes.push(o));
+    nodes.forEach(node => {
+      const buckets = new Map();
+      node.children.forEach(c => {
+        if (c.children.length || keep.has(c) || Array.isArray(c.material) || !bakeable(c, true) || !(c.visible || own.has(c))) return;
+        const g = c.geometry, sig = Object.keys(g.attributes).sort().map(a => a + g.attributes[a].itemSize).join();
+        const key = [c.material.uuid, +c.castShadow, +c.receiveShadow, c.renderOrder, sig, own.get(c) || ''].join('|');
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(c);
+      });
+      buckets.forEach(list => {
+        if (list.length < 2) return;
+        const c0 = list[0], mesh = new THREE.Mesh(joinParts(list), c0.material), n = own.get(c0);
+        Object.assign(mesh, { castShadow: c0.castShadow, receiveShadow: c0.receiveShadow, renderOrder: c0.renderOrder, visible: c0.visible });
+        mesh.userData.noPick = true;
+        list.forEach(c => node.remove(c)); node.add(mesh);
+        if (n) { const o = outfits[n]; o.parts = o.parts.filter(p => !list.includes(p)); o.parts.push(mesh); }
+      });
+    });
+    return k;
+  }
   /* Cada niño se arma la primera vez que se juega con él (2026-09-21): los tres juntos eran casi la mitad del arranque de la
      página, aunque no se entrara al juego. kidOf lo arma si todavía no está; mientras, startGame muestra "Preparando el juego" */
   const KID_MAKE = { franco: makeFranco, alayna: makeAlayna, amanda: makeAmanda, maritza: makeMaritza };
   const KID_NAME = { franco: 'Franco', alayna: 'Alayna', amanda: 'Amanda', maritza: 'Maritza' };
   const KIDS = {};
-  const kidOf = who => KIDS[who] || (KIDS[who] = KID_MAKE[who]());
+  const kidOf = who => KIDS[who] || (KIDS[who] = packKid(KID_MAKE[who]()));
   const KID_ORDER = ['franco', 'alayna', 'amanda', 'maritza'];
   let kid = null;                                             // el que se está jugando (ninguno hasta entrar al juego)
 
@@ -5614,7 +5674,7 @@
       : act === 'angry' ? svg('<circle cx="12" cy="14" r="7"/><path d="M8.5 11.5l2.6 1.1M15.5 11.5l-2.6 1.1M9.3 18.2c1.6-1.4 3.8-1.4 5.4 0M3.2 8.5c-1.3-1.2.5-2.6-.6-4M20.8 8.5c1.3-1.2-.5-2.6.6-4"/>')
       : wb.dataset.wave;
     const label = act === 'dance' ? 'Bailar' : act === 'angry' ? 'Enojarse' : 'Saludar';
-    wb.title = label + ' (Q)'; wb.setAttribute('aria-label', label);
+    wb.title = label + ' (Q)'; wb.setAttribute('aria-label', label); $('#fh-keys-q').textContent = label.toLowerCase();
     swapBtn.title = `Cambiar a ${other}`; swapBtn.setAttribute('aria-label', `Jugando con ${kid.name}. Cambiar a ${other}`);
     if (fr.on) playMusic(who);                                // cada niño con su canción
   }
