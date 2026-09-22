@@ -34,6 +34,7 @@
     --rule-strong:rgba(29,33,37,.5);
     --accent:#A45F2C;
     --accent-soft:rgba(164,95,44,.12);
+    --measure:#2F6FD0;                          /* la herramienta de medir: azul, para que resalte sobre la tierra y las líneas rojas del lote */
     --shadow:0 1px 0 rgba(29,33,37,.05), 0 10px 28px -14px rgba(29,33,37,.4);
     --glass:rgba(251,250,246,.55);
     --display:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif;
@@ -44,14 +45,14 @@
     :root:not([data-theme="light"]){
       --ground:#101315; --paper:#181B1E; --paper-2:#212529; --ink:#ECE8E1; --ink-2:#A6A39D;
       --rule:rgba(236,232,225,.13); --rule-strong:rgba(236,232,225,.45);
-      --accent:#DC9A62; --accent-soft:rgba(220,154,98,.16);
+      --accent:#DC9A62; --accent-soft:rgba(220,154,98,.16); --measure:#6FA3F2;
       --shadow:0 10px 30px -12px rgba(0,0,0,.75); --glass:rgba(24,27,30,.55);
     }
   }
   :root[data-theme="dark"]{
     --ground:#101315; --paper:#181B1E; --paper-2:#212529; --ink:#ECE8E1; --ink-2:#A6A39D;
     --rule:rgba(236,232,225,.13); --rule-strong:rgba(236,232,225,.45);
-    --accent:#DC9A62; --accent-soft:rgba(220,154,98,.16);
+    --accent:#DC9A62; --accent-soft:rgba(220,154,98,.16); --measure:#6FA3F2;
     --shadow:0 10px 30px -12px rgba(0,0,0,.75); --glass:rgba(24,27,30,.55);
   }
   [hidden]{display:none!important}
@@ -162,6 +163,31 @@
   .hint{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);margin:0;padding:7px 12px;background:var(--paper);border:1px solid var(--rule);color:var(--ink-2);font-size:12.5px;white-space:nowrap;pointer-events:none;transition:opacity .6s ease}
   .hint.is-gone{opacity:0}
 
+  /* Medir y Compartir: debajo de las vistas en la computadora; en el teléfono, dos botones redondos sobre la hoja de abajo */
+  .tools{display:flex;margin-bottom:auto}
+  .tools button{display:flex;align-items:center;gap:7px;padding:9px 12px;background:none;border:0;border-right:1px solid var(--rule);color:var(--ink);
+    font:600 13px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;cursor:pointer}
+  .tools button:last-child{border-right:0}
+  .tools button:hover{background:var(--paper-2)}
+  .tools button[aria-pressed="true"]{background:var(--measure);color:#fff}
+  .tools svg{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  /* La barra de la medida: qué tocar, y después la distancia */
+  .measure-bar{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:4;display:flex;align-items:stretch;max-width:calc(100% - 32px)}
+  .mb-text{margin:0;padding:9px 14px;align-self:center;font:500 13.5px/1.3 var(--body);color:var(--ink);white-space:nowrap}
+  .mb-text b{font:600 20px/1 var(--display);letter-spacing:.02em;font-variant-numeric:tabular-nums;color:var(--measure)}
+  .mb-text small{margin-left:8px;font:500 12.5px/1 var(--body);color:var(--ink-2)}
+  .measure-bar button{flex:none;padding:0 13px;background:none;border:0;border-left:1px solid var(--rule);color:var(--ink);font:600 12px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+  .measure-bar button:hover{background:var(--paper-2)}
+  .measure-bar .mb-done{background:var(--ink);color:var(--paper)}
+  .measure-bar .mb-done:hover{background:var(--measure)}
+  body.is-measuring .hint{display:none}
+  #stage.is-measuring,#stage.is-measuring:active{cursor:crosshair}
+  /* Aviso corto arriba (el link copiado) */
+  .toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:10px;
+    max-width:calc(100% - 32px);margin:0;padding:10px 14px;font:500 13.5px/1.35 var(--body);color:var(--ink)}
+  .toast input{width:260px;min-width:0;flex:1 1 auto;padding:7px 8px;border:1px solid var(--rule-strong);background:var(--paper-2);color:var(--ink);font:500 12.5px/1 var(--body)}
+  .toast button{flex:none;padding:7px 10px;background:none;border:1px solid var(--rule-strong);color:var(--ink);font:600 12px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+
   /* 3D labels */
   .lbl{position:absolute;left:0;top:0;white-space:nowrap;will-change:transform}
   .lbl.room{pointer-events:auto;cursor:pointer;background:var(--paper);border:1px solid var(--rule-strong);padding:4px 8px 5px;text-align:center;color:var(--ink);font:600 12px/1.05 var(--display);letter-spacing:.09em;text-transform:uppercase;box-shadow:var(--shadow)}
@@ -172,6 +198,7 @@
   .lbl.room.is-sel .ld{display:inline}
   .lbl.dim.lot-pt{background:#E0241B;color:#fff;border-color:#E0241B;border-radius:999px;min-width:20px;text-align:center}
   .lbl.dim.nb{border-color:#F2A516;box-shadow:inset 0 -2px 0 #F2A516}
+  .lbl.dim.measure{background:var(--measure);color:#fff;border-color:var(--measure);padding:4px 7px 3px;font-size:14px;box-shadow:var(--shadow)}
   .lbl.dim{background:var(--paper);color:var(--ink);padding:3px 5px 2px;font:600 12px/1 var(--display);letter-spacing:.03em;font-variant-numeric:tabular-nums;border:1px solid var(--rule)}
 
   .tb-more,.sheet-grip,.sheet-tabs{display:none}
@@ -308,6 +335,16 @@
     .ctl-body .room-desc{padding-left:24px}
     .move-row label{letter-spacing:.1em}
     .move .note,#names-note{display:none}                     /* no aportan en pantalla chica */
+    /* Medir y Compartir: redondos, a la derecha y justo encima de la hoja, que suben con ella */
+    .tools{position:absolute;right:10px;bottom:calc(100% + 10px);flex-direction:column;gap:8px;margin:0;background:none;border:0;box-shadow:none}
+    .tools button,.tools button:last-child{justify-content:center;width:46px;height:46px;padding:0;border:1px solid var(--rule-strong);border-radius:50%;background:var(--paper);box-shadow:var(--shadow)}
+    .tools button span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+    .tools svg{width:22px;height:22px}
+    .measure-bar{top:calc(62px + env(safe-area-inset-top,0px));bottom:auto;left:10px;right:10px;transform:none;max-width:none}
+    .mb-text{flex:1 1 auto;min-width:0;padding:8px 10px;white-space:normal}
+    .mb-text small{display:block;margin:3px 0 0}
+    .toast{top:calc(62px + env(safe-area-inset-top,0px));left:10px;right:10px;transform:none;max-width:none}
+    .toast input{width:auto}
 
     /* el encabezado recorta lo que se sale de él, así que el submenú de Jugar va fijo en la pantalla, debajo */
     .play-menu{position:fixed;top:calc(58px + env(safe-area-inset-top,0px));right:10px}
@@ -375,6 +412,10 @@
       </div>
     </div>
   </nav>
+  <div class="tools panel" id="tools">
+    <button type="button" id="t-measure" aria-pressed="false" title="Medir: toca dos puntos del modelo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15.5 15.5 3 21 8.5 8.5 21z"/><path d="M6.8 11.7l1.8 1.8M9.6 8.9l1.2 1.2M12.4 6.1l1.8 1.8M8.2 16.4l1.2 1.2"/></svg><span>Medir</span></button>
+    <button type="button" id="t-share" title="Compartir esta vista: un link que abre la casa tal como la ves"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/></svg><span>Compartir</span></button>
+  </div>
   <div class="sheet-grip" id="sheet-grip"><span></span></div>
   <div class="sheet-tabs" id="sheet-tabs">
     <button type="button" data-tab="spaces" aria-pressed="false">Espacios</button>
@@ -428,6 +469,12 @@
 </div>
 
 <p class="hint" id="hint">Arrastra para girar · rueda para acercar · clic derecho para desplazar · toca un espacio para ver sus medidas</p>
+<div class="measure-bar panel" id="measure-bar" hidden>
+  <p class="mb-text" id="mb-text" role="status" aria-live="polite">Toca el primer punto</p>
+  <button type="button" id="mb-clear">Borrar</button>
+  <button type="button" class="mb-done" id="mb-done">Listo</button>
+</div>
+<div class="toast panel" id="toast" role="status" aria-live="polite" hidden></div>
 <div class="play-hud" id="play-hud" hidden>
   <div class="fh-bar panel">
     <button type="button" class="fh-who" id="fh-swap"><b id="fh-name">Franco</b><span id="fh-room">Corredor</span></button>
@@ -2337,6 +2384,12 @@
     cust.className = 'sw custom'; cust.title = 'Otro color';
     cust.innerHTML = `<input type="color" id="sw-${p.id}-otro" value="${p.colors[0][1].toLowerCase()}" aria-label="${p.name}: elegir otro color">`;
     cust.querySelector('input').addEventListener('input', e => { cust.style.setProperty('--c', e.target.value); choose(e.target.value, 'Otro color', null); });
+    // Poner un color desde afuera (un link compartido): el de la lista si está, si no como "Otro color"
+    p.set = hex => {
+      const i = p.colors.findIndex(([, h]) => h.toLowerCase() === hex.toLowerCase());
+      if (i >= 0) { choose(p.colors[i][1], p.colors[i][0], chips[i]); return; }
+      cust.querySelector('input').value = hex; cust.style.setProperty('--c', hex); choose(hex, 'Otro color', null);
+    };
     grid.appendChild(cust);
     $('#paints').appendChild(fs);
     choose(p.colors[0][1], p.colors[0][0], chips[0]);
@@ -2421,13 +2474,187 @@
     if (!down) return;
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y); down = null;
     if (moved > 6) return;
+    if (MEASURE.on) { measureTap(e); return; }               // midiendo, el toque pone un punto (sección medir)
     const id = pick(e); select(id && id !== selected ? id : null);
   });
   let hoverQueued = false, lastMove = null;
   canvas.addEventListener('pointermove', e => {
     if (e.buttons || e.pointerType !== 'mouse' || fr.on) return;
     lastMove = e;
-    if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(() => { hoverQueued = false; canvas.style.cursor = pick(lastMove) ? 'pointer' : ''; }); }
+    if (!hoverQueued) {
+      hoverQueued = true;
+      requestAnimationFrame(() => {
+        hoverQueued = false;
+        if (MEASURE.on) { measureHover(lastMove); canvas.style.cursor = ''; } else canvas.style.cursor = pick(lastMove) ? 'pointer' : '';
+      });
+    }
+  });
+
+  /* ---------- medir ---------- */
+  /* Medir (pedido de la dueña, 2026-09-21): con el botón Medir prendido se tocan dos puntos del modelo —paredes, muebles, techo,
+     terreno, calle, vecinos— y sale la distancia entre ellos; si hay desnivel, también la horizontal y el alto. En la computadora,
+     antes del segundo toque, la línea sigue al puntero. La línea y los puntos se dibujan encima de todo (depthTest apagado), para
+     que no se escondan detrás de una pared, y su grueso se ajusta a la distancia de la cámara. Un tercer toque empieza otra medida;
+     Borrar la quita y Listo (o Esc) sale. El terreno no entra en el raycast (50 000 vértices): el punto en el suelo se busca
+     caminando por el rayo con groundY (o boqY con el boquete). Arrastrar sigue girando la cámara */
+  const MEASURE = { on: false, a: null, b: null, h: null };
+  const measureG = new THREE.Group(); measureG.visible = false; scene.add(measureG);
+  const mMat = new THREE.MeshBasicMaterial({ color: 0x2F6FD0, depthTest: false, depthWrite: false, transparent: true, fog: false });
+  const mDotGeo = new THREE.SphereGeometry(1, 16, 10);
+  const mA = new THREE.Mesh(mDotGeo, mMat), mB = new THREE.Mesh(mDotGeo, mMat);
+  const mLine = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 10, 1, true), mMat);
+  [mA, mB, mLine].forEach(m => { m.renderOrder = 20; measureG.add(m); });
+  const mLabel = addLabel('dim measure', '', new V3()); mLabel.grp = mLine;   // se ve cuando se ve la línea
+  const mRay = new THREE.Raycaster(), mNdc = new THREE.Vector2();
+  function pointAt(e) {
+    mNdc.set(e.clientX / window.innerWidth * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+    mRay.setFromCamera(mNdc, camera);
+    const cand = [];
+    [house, roof, furn, site, neighbors, extra].forEach(g => g.traverseVisible(o => { if (o.isMesh && !o.userData.noPick) cand.push(o); }));
+    const hit = mRay.intersectObjects(cand, false)[0];
+    let best = hit ? hit.point.clone() : null;
+    // El suelo: pasos que crecen con la distancia y, al pasar abajo, se afina entre los dos últimos
+    const yOf = state.boq ? boqY : groundY, o = mRay.ray.origin, d = mRay.ray.direction, far = hit ? hit.distance : 300;
+    const below = s => o.y + d.y * s <= yOf(o.x + d.x * s, o.z + d.z * s);
+    for (let s = 0, prev = 0; s < far; prev = s, s += Math.max(0.05, s * 0.01)) {
+      if (!below(s)) continue;
+      let lo = prev, hi = s;
+      for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if (below(m)) hi = m; else lo = m; }
+      best = new V3().copy(o).addScaledVector(d, hi);
+      break;
+    }
+    return best;
+  }
+  const fmtM = v => `${v.toFixed(2)} m`;
+  function drawMeasure() {
+    const { a, h } = MEASURE, b = MEASURE.b || h, bar = $('#mb-text');
+    measureG.visible = MEASURE.on && !!(a || h);
+    mA.visible = !!(a || h); mA.position.copy(a || h || mA.position);
+    mB.visible = mLine.visible = !!(a && b);
+    if (a && b) {
+      const dv = new V3().subVectors(b, a), len = dv.length();
+      mB.position.copy(b);
+      mLine.position.copy(a).addScaledVector(dv, 0.5); mLine.userData.len = len;
+      if (len > 1e-6) mLine.quaternion.setFromUnitVectors(UPY, dv.clone().normalize());
+      mLabel.pos.copy(mLine.position); mLabel.el.textContent = fmtM(len);
+    }
+    if (!a) bar.textContent = 'Toca el primer punto';
+    else if (!MEASURE.b) bar.textContent = 'Toca el segundo punto';
+    else {
+      const dv = new V3().subVectors(MEASURE.b, a), flat = Math.hypot(dv.x, dv.z);
+      bar.innerHTML = `<b>${fmtM(dv.length())}</b>` + (Math.abs(dv.y) >= 0.05 ? ` <small>horizontal ${fmtM(flat)} · alto ${fmtM(Math.abs(dv.y))}</small>` : '');
+    }
+    wake();
+  }
+  // Grueso de la línea y de los puntos según la distancia de la cámara (lo llama el bucle antes de dibujar)
+  function measureScale() {
+    const k = p => Math.max(0.02, camera.position.distanceTo(p) * 0.007);
+    mA.scale.setScalar(k(mA.position)); mB.scale.setScalar(k(mB.position));
+    if (mLine.visible) { const r = Math.max(0.006, camera.position.distanceTo(mLine.position) * 0.0022); mLine.scale.set(r, mLine.userData.len, r); }
+  }
+  function measureTap(e) {
+    const p = pointAt(e);
+    if (!p) return;
+    if (!MEASURE.a || MEASURE.b) { MEASURE.a = p; MEASURE.b = null; } else MEASURE.b = p;
+    MEASURE.h = null; drawMeasure();
+  }
+  function measureHover(e) {
+    if (MEASURE.b) return;                                    // con la medida hecha, el puntero ya no la mueve
+    MEASURE.h = pointAt(e); drawMeasure();
+  }
+  function setMeasure(on) {
+    MEASURE.on = on; MEASURE.h = null;
+    if (!on) MEASURE.a = MEASURE.b = null;
+    $('#t-measure').setAttribute('aria-pressed', String(on));
+    $('#measure-bar').hidden = !on;
+    canvas.classList.toggle('is-measuring', on); document.body.classList.toggle('is-measuring', on);
+    if (on) { select(null); if (mob.matches) setTab(null); }  // la hoja se cierra para ver dónde se toca
+    drawMeasure();
+  }
+  $('#t-measure').addEventListener('click', () => setMeasure(!MEASURE.on));
+  $('#mb-clear').addEventListener('click', () => { MEASURE.a = MEASURE.b = MEASURE.h = null; drawMeasure(); });
+  $('#mb-done').addEventListener('click', () => setMeasure(false));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && MEASURE.on && !fr.on) setMeasure(false); });
+
+  /* ---------- compartir esta vista ---------- */
+  /* Compartir esta vista (pedido de la dueña, 2026-09-21): el botón Compartir arma un link que abre la página tal como está —la
+     cámara, la vista, las capas, la hora, los colores, la casa movida, el espacio escogido y la medida, si hay— y lo manda por el
+     menú de compartir del teléfono (WhatsApp y los demás) o, en la computadora, lo copia. Todo va después del # (location.hash),
+     así sirve también abriendo el archivo con doble clic. Al abrir un link así, applyShared lo lee al final del arranque; lo que
+     no entienda lo deja como siempre. La distancia de la cámara se ajusta a la pantalla que lo abre, igual que en viewPose, para
+     que lo mandado desde la computadora se vea completo en el teléfono y al revés */
+  const SHARE_LAYERS = ['roof', 'furn', 'names', 'dims', 'nb', 'boq', 'losa', 'techo'];
+  const narrowFit = a => a < 1.25 ? Math.min(2.3, 1.25 / a) : 1;
+  const r2 = n => String(Math.round(n * 100) / 100);
+  function shareURL() {
+    const c = camera.position, t = controls.target, q = [
+      'vista=' + state.view,
+      'cam=' + [c.x, c.y, c.z, t.x, t.y, t.z].map(r2).join(','),
+      'pantalla=' + r2(camera.aspect),
+      'capas=' + SHARE_LAYERS.map(k => (state[k] ? 1 : 0)).join(''),
+      'hora=' + r2(lastHour),
+      'colores=' + PAINTS.map(p => p.mat.color.getHexString()).join(','),
+    ];
+    if (MOVE.front || MOVE.side || MOVE.turn) q.push('mover=' + [MOVE.front, MOVE.side, MOVE.turn * 180 / Math.PI].map(r2).join(','));
+    if (selected) q.push('espacio=' + selected);
+    if (MEASURE.a && MEASURE.b) q.push('medida=' + [MEASURE.a, MEASURE.b].flatMap(v => [v.x, v.y, v.z]).map(r2).join(','));
+    return location.href.split('#')[0] + '#' + q.join('&');
+  }
+  // Lee el link al abrir la página. Devuelve a dónde volar con la cámara, o null si no trae nada
+  function applyShared(hash) {
+    const q = new URLSearchParams(hash.replace(/^#/, ''));
+    if (!q.has('vista') && !q.has('cam')) return null;
+    const nums = (k, n) => { const v = (q.get(k) || '').split(',').map(Number); return v.length === n && v.every(Number.isFinite) ? v : null; };
+    const view = q.get('vista');
+    if (VIEWS[view]) {
+      state.view = view;
+      document.querySelectorAll('.views button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+    }
+    const lay = q.get('capas');
+    if (/^[01]{8}$/.test(lay || '')) {
+      const on = Object.fromEntries(SHARE_LAYERS.map((k, i) => [k, lay[i] === '1']));
+      setBoq(on.boq); if (on.boq) { setLosa(on.losa); if (on.losa) setTecho(on.techo); }
+      setRoof(on.roof); setFurn(on.furn); setNames(on.names); setDims(on.dims); setNb(on.nb);
+    }
+    const mv = nums('mover', 3);
+    if (mv) setMove(mv[0], mv[1], mv[2] * Math.PI / 180);
+    const hr = Number(q.get('hora'));
+    if (q.has('hora') && hr >= 5.5 && hr <= 20.5) { $('#hour').value = hr; applyHour(hr); }
+    const cols = (q.get('colores') || '').split(',');
+    PAINTS.forEach((p, i) => { if (/^[0-9a-f]{6}$/i.test(cols[i] || '')) p.set('#' + cols[i]); });
+    const room = q.get('espacio');
+    if (ROOMS.some(r => r.id === room)) select(room);
+    const md = nums('medida', 6);
+    if (md) { setMeasure(true); MEASURE.a = new V3(md[0], md[1], md[2]); MEASURE.b = new V3(md[3], md[4], md[5]); drawMeasure(); }
+    const cam = nums('cam', 6);
+    if (!cam) return VIEWS[view] ? viewPose(view) : null;
+    const p = new V3(cam[0], cam[1], cam[2]), t = new V3(cam[3], cam[4], cam[5]), sent = Number(q.get('pantalla')) || camera.aspect;
+    p.sub(t).multiplyScalar(narrowFit(camera.aspect) / narrowFit(sent)).add(t);
+    return { p, t };
+  }
+  // El aviso de arriba: se va solo; si no se pudo copiar, muestra el link para copiarlo a mano
+  let toastT = 0;
+  function toast(text, url) {
+    const el = $('#toast'); clearTimeout(toastT);
+    el.textContent = text; el.hidden = false;
+    if (url) {
+      const inp = document.createElement('input'), close = document.createElement('button');
+      inp.value = url; inp.readOnly = true; inp.setAttribute('aria-label', 'Link de esta vista');
+      close.type = 'button'; close.textContent = 'Cerrar'; close.addEventListener('click', () => { el.hidden = true; });
+      el.append(inp, close); inp.focus(); inp.select();
+      return;
+    }
+    toastT = setTimeout(() => { el.hidden = true; }, 2600);
+  }
+  $('#t-share').addEventListener('click', async () => {
+    const url = shareURL();
+    try { history.replaceState(null, '', url.slice(url.indexOf('#'))); } catch (err) { /* la barra de direcciones queda igual */ }
+    if (navigator.share && matchMedia('(pointer: coarse)').matches) {   // teléfono: el menú de compartir (WhatsApp, etc.)
+      try { await navigator.share({ title: 'Casa Lizano Vega', text: 'Mira la casa así:', url }); return; }
+      catch (err) { if (err && err.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(url); toast('Link copiado. Pégalo en WhatsApp o donde quieras.'); }
+    catch (err) { toast('Copia este link:', url); }
   });
 
   /* ---------- niños: modo videojuego ---------- */
@@ -4778,7 +5005,7 @@
     document.body.classList.toggle('is-playing', on);
     keys.clear(); lookDrag = null; resetSticks.forEach(f => f());
     if (on) {
-      fr.prev = state.view; tween = null; select(null);
+      fr.prev = state.view; tween = null; select(null); setMeasure(false);
       if (mob.matches) setTab(null);
       setKid(who || fr.who || 'franco');
       // Arranca en el corredor, frente a la puerta principal, con la cámara detrás
@@ -4909,6 +5136,10 @@
   }
   setRoof(true); setFurn(true); setNames(true); setDims(false); setNb(true); setBoq(false); setLosa(false); setTecho(false);
   applyHour(10);
+  // Un link de Compartir esta vista arranca como lo dejó quien lo mandó; si pegan otro en la misma pestaña, también
+  const openShared = () => { const s = applyShared(location.hash); if (s) flyTo(s.p, s.t); };
+  openShared();
+  window.addEventListener('hashchange', openShared);
 
   const v = new V3();
   const shown = o => { for (; o; o = o.parent) if (!o.visible) return false; return true; };   // visible con todos sus padres
@@ -4944,6 +5175,7 @@
     }
     if (!busy && !firstFrame) return;                         // nada cambió: queda el último cuadro
     keylinStep(now);
+    if (measureG.visible) measureScale();                     // la medida, del mismo grueso en pantalla de cerca y de lejos
     renderer.render(scene, camera);
     if (!fr.on) updateLabels();
     if (firstFrame) { firstFrame = false; setLoading(null); }  // ya se ve la casa
