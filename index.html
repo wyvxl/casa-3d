@@ -3410,7 +3410,66 @@
     const [nx, ny] = pushOut(fr.x + ox / dist * need, fr.y + oy / dist * need);
     if (canStand(nx, ny)) { fr.x = nx; fr.y = ny; }
   }
+  /* Las hojas chocan entre ellas (pedido de la dueña, 2026-09-21). En el pasillo, las del dormitorio 1, el dormitorio 2 y el
+     baño abren hacia el mismo lado y al girar se cruzan; antes se atravesaban. Cada hoja es un tramo de la bisagra a la punta,
+     de LEAF_T de medio grueso. Si al moverse una se mete en otra, la empuja —si esa puede girar sin pasarse de sus topes, sin
+     meterse en el niño y sin estar trabada en el marco— y le pasa el impulso; si no puede, la que pegó se queda donde la toca.
+     Suena un golpe al tocarse, no mientras siguen pegadas. Solo se revisan las parejas que se alcanzan (LEAF_PAIRS): el
+     dormitorio 1 con el baño y el dormitorio 2 con el baño; las de los dos dormitorios quedan muy lejos */
+  const leafSeg = (d, th) => { const a = d.rot0 + th; return [d.hx, d.hy, d.hx + Math.cos(a) * d.L, d.hy - Math.sin(a) * d.L]; };
+  const ptSeg = (px, py, s) => {
+    const dx = s[2] - s[0], dy = s[3] - s[1], t = Math.max(0, Math.min(1, ((px - s[0]) * dx + (py - s[1]) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(px - s[0] - dx * t, py - s[1] - dy * t);
+  };
+  const sideOf = (s, px, py) => (s[2] - s[0]) * (py - s[1]) - (s[3] - s[1]) * (px - s[0]);
+  const leafGap = (a, tha, b, thb) => {                       // lo que queda entre las dos hojas (0 si se cruzan)
+    const p = leafSeg(a, tha), q = leafSeg(b, thb);
+    if (sideOf(p, q[0], q[1]) * sideOf(p, q[2], q[3]) < 0 && sideOf(q, p[0], p[1]) * sideOf(q, p[2], p[3]) < 0) return 0;
+    return Math.min(ptSeg(q[0], q[1], p), ptSeg(q[2], q[3], p), ptSeg(p[0], p[1], q), ptSeg(p[2], p[3], q));
+  };
+  const LEAF_GAP = 2 * LEAF_T, LEAF_PAIRS = [];
+  DOORS.forEach(d => { d.near = []; });
+  DOORS.forEach((a, i) => DOORS.slice(i + 1).forEach(b => {
+    if (Math.hypot(a.hx - b.hx, a.hy - b.hy) >= a.L + b.L + LEAF_GAP) return;
+    const pr = { a, b, touch: false }; LEAF_PAIRS.push(pr); a.near.push([b, pr]); b.near.push([a, pr]);
+  }));
+  /* Cada cuadro las hojas arrancan sin tocarse (th0). Se mueven una por una hasta donde las dejó doorsStep (want), cada una
+     contra las otras como ya quedaron: así nunca quedan encimadas, aunque se muevan dos a la vez */
+  function leavesStep(dt) {
+    const want = DOORS.map(d => d.th), pushed = new Set();
+    DOORS.forEach(d => { d.th = d.th0; });
+    DOORS.forEach((m, i) => {
+      if (pushed.has(m)) return;                               // ya la movió otra hoja en este cuadro
+      m.th = want[i];
+      if (m.th === m.th0) return;
+      for (const [p, pr] of m.near) {
+        if (leafGap(m, m.th, p, p.th) >= LEAF_GAP) continue;
+        // Dónde la tocó (si venía rápido pudo pasarse de largo) y para dónde se aleja la otra: se prueba con la que pegó apenas
+        // pasada de ese punto
+        let free = m.th0, hit = m.th;
+        if (leafGap(m, free, p, p.th) < LEAF_GAP) { m.th = m.th0; m.w = 0; break; }
+        for (let k = 0; k < 14; k++) { const mid = (free + hit) / 2; if (leafGap(m, mid, p, p.th) >= LEAF_GAP) free = mid; else hit = mid; }
+        const speed = (m.th - m.th0) / Math.max(dt, 1e-3), th0 = p.th, past = free + Math.sign(m.th - m.th0) * 0.01;
+        const sg = leafGap(m, past, p, th0 + 0.02) >= leafGap(m, past, p, th0 - 0.02) ? 1 : -1;
+        // La empuja si puede: sin pasarse de sus topes ni del marco (trabada no se deja), sin meterse en el niño ni en su otra vecina
+        let th = th0, ok = false;
+        if (th0 !== 0) for (let k = 0; k < 60; k++) {
+          th += sg * 0.01;
+          if (th > p.hi || th < p.lo || Math.sign(th) !== Math.sign(th0) || leafDist(p, th, fr.x, fr.y) < FR_R + LEAF_T) break;
+          if (p.near.some(([q]) => q !== m && leafGap(p, th, q, q.th) < LEAF_GAP)) break;
+          if (leafGap(m, m.th, p, th) >= LEAF_GAP) { ok = true; break; }
+        }
+        if (ok) { p.w = Math.max(-5, Math.min(5, (th - th0) / Math.max(dt, 1e-3))); p.hold = Math.max(p.hold, 0.3); p.th = th; pushed.add(p); }
+        else { m.th = free; m.w = 0; m.pull = 0; }              // no la pudo mover: la que pegó se queda donde la toca
+        if (!pr.touch) doorSound('bump', speed);               // suena al pegar, no mientras siguen pegadas
+        pr.touch = true;
+      }
+    });
+    for (const pr of LEAF_PAIRS) if (leafGap(pr.a, pr.a.th, pr.b, pr.b.th) > LEAF_GAP + 0.01) pr.touch = false;
+    for (const d of DOORS) { if (leafHits(d, d.th)) pushFromLeaf(d); d.leaf.rotation.y = d.rot0 + d.th; }
+  }
   function doorsStep(dt) {
+    for (const d of DOORS) d.th0 = d.th;                       // cómo estaba cada hoja al empezar el cuadro (leavesStep)
     for (const d of DOORS) {
       d.hold = Math.max(0, d.hold - dt);
       const side = Math.sign((fr.x - d.hx) * d.nx + (fr.y - d.hy) * d.ny) || 1;   // de qué lado de la pared está él
@@ -3463,6 +3522,7 @@
       if (leafHits(d, th)) pushFromLeaf(d);
       d.leaf.rotation.y = d.rot0 + d.th;
     }
+    leavesStep(dt);                                           // y que no se atraviesen entre ellas
   }
 
   // La cámara no pasa paredes, columnas, marcos ni hojas de puerta: devuelve qué fracción del tramo de a a b está libre
