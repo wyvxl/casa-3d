@@ -260,6 +260,16 @@
   .fh-photo{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
     font:600 13px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
   .fh-photo:hover{background:var(--accent);border-color:var(--accent)}
+  /* Las estrellas: la cuenta en la barra (brinca al recoger una) y el aviso al juntarlas todas */
+  .fh-stars{display:flex;align-items:center;gap:6px;flex:0 0 auto;padding:0 12px;border-left:1px solid var(--rule);color:var(--ink);font:600 18px/1 var(--display);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+  .fh-stars svg{width:20px;height:20px;fill:#F5B400;stroke:#9A6A00;stroke-width:1.2;stroke-linejoin:round}
+  .fh-stars.is-pop svg{animation:star-pop .45s ease}
+  @keyframes star-pop{40%{transform:scale(1.55) rotate(18deg)}}
+  .fh-win{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 22px 18px;text-align:center;animation:act-pop .3s ease}
+  .fh-win b{font:700 26px/1.05 var(--display);letter-spacing:.03em;text-transform:uppercase;text-wrap:balance}
+  .fh-win button{margin-top:6px;padding:10px 14px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);font:600 13px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+  .fh-win button:hover{background:var(--accent);border-color:var(--accent)}
+  @media (prefers-reduced-motion: reduce){ .fh-win{animation:none} }
   .fh-map{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:140px;height:140px;border:1px solid var(--rule-strong);box-shadow:var(--shadow);background:var(--paper);pointer-events:none}
   .fh-flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .45s ease}
   .fh-flash.is-on{opacity:.85;transition:none}
@@ -353,6 +363,10 @@
     .fh-map{top:calc(72px + env(safe-area-inset-top,0px));right:10px;width:110px;height:110px}
     .fh-who{flex:1 1 auto;padding:8px 10px}
     .fh-who b{font-size:18px}
+    .fh-stars{padding:0 9px;gap:4px;font-size:16px}
+    .fh-stars svg{width:18px;height:18px}
+    .fh-win{width:calc(100% - 40px)}
+    .fh-win b{font-size:21px}
     .fh-btn{padding:0 11px;font-size:12px;letter-spacing:.08em}
     .stick{width:124px;height:124px;bottom:calc(22px + env(safe-area-inset-bottom,0px))}
     .stick-move{left:calc(18px + env(safe-area-inset-left,0px))}
@@ -478,6 +492,7 @@
 <div class="play-hud" id="play-hud" hidden>
   <div class="fh-bar panel">
     <button type="button" class="fh-who" id="fh-swap"><b id="fh-name">Franco</b><span id="fh-room">Corredor</span></button>
+    <span class="fh-stars" id="fh-stars" role="status" aria-label="Estrellas" title="Estrellas encontradas" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.7 5.9 6.4.7-4.8 4.3 1.4 6.3L12 16.8 6.3 20l1.4-6.3L2.9 9.4l6.4-.7z"/></svg><b id="fh-stars-n">0/8</b></span>
     <button type="button" class="fh-btn fh-music" id="fh-music" aria-pressed="true" aria-label="Sonido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5h4l5.5 4.5v-14L7 9.5z" fill="currentColor"/><path class="wave" d="M15.5 8.8a4.5 4.5 0 0 1 0 6.4M18.2 6.2a8.2 8.2 0 0 1 0 11.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="mute" d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <button type="button" class="fh-btn fh-more" id="fh-more" aria-expanded="false" aria-controls="fh-panel" title="Más: hora, lluvia, mapa, foto" aria-label="Más opciones"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
     <button type="button" class="fh-btn fh-exit" id="fh-exit">Salir del juego</button>
@@ -500,6 +515,7 @@
   </div>
   <canvas class="fh-map" id="fh-minimap" width="280" height="280" aria-label="Mapa: el niño es la flecha"></canvas>
   <div class="fh-flash" id="fh-flash"></div>
+  <div class="fh-win panel" id="fh-win" role="status" hidden><p class="sec-h">¡Lo lograste!</p><b id="fh-win-t">Encontraste las 8 estrellas</b><button type="button" id="fh-again">Esconderlas otra vez</button></div>
   <div class="stick stick-move" id="stick-move" role="img" aria-label="Joystick para caminar"><span class="stick-lbl">Caminar</span><i class="knob"></i></div>
   <div class="stick stick-look" id="stick-look" role="img" aria-label="Joystick para mirar"><span class="stick-lbl">Mirar</span><i class="knob"></i></div>
   <div class="acts">
@@ -3873,7 +3889,7 @@
       fr.yawT = Math.atan2(fr.wantX, fr.wantY);
     }
     doorsStep(dt);
-    ballStep(dt); thingsStep(dt, t); dogStep(dt, t); playStepIdle(dt, t); worldStep(dt, t);
+    ballStep(dt); thingsStep(dt, t); dogStep(dt, t); playStepIdle(dt, t); worldStep(dt, t); starsStep(dt, t);
 
     // Cuerpo: gira hacia donde camina y, según lo que avanzó, mece las piernas (la rodilla se dobla cuando la pierna va hacia
     // adelante y el pie se mantiene casi plano) y los brazos (el codo se dobla más en el brazo que va adelante). Quieto,
@@ -4957,6 +4973,12 @@
     const dot = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
     if (ball.visible) dot(BALL.x, BALL.y, 0.26, '#E53935');
     if (dog.visible) dot(DOG.x, DOG.y, 0.3, '#8E5A2B');
+    STARS.forEach(st => {                                                                // las estrellas que faltan
+      if (st.got) return;
+      g.beginPath();
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.2 : 0.5; g.lineTo(st.x + Math.cos(a) * r, st.y + Math.sin(a) * r); }
+      g.closePath(); g.fillStyle = '#F5B400'; g.fill(); g.strokeStyle = '#9A6A00'; g.lineWidth = 0.06; g.stroke();
+    });
     g.translate(fr.x, fr.y); g.rotate(-fr.yaw + Math.PI); g.scale(1.6, 1.6);                                  // el niño: una flecha hacia donde mira
     g.fillStyle = '#A45F2C'; g.strokeStyle = '#fff'; g.lineWidth = 0.08;
     g.beginPath(); g.moveTo(0, -0.55); g.lineTo(0.38, 0.4); g.lineTo(0, 0.22); g.lineTo(-0.38, 0.4); g.closePath(); g.fill(); g.stroke();
@@ -4982,6 +5004,180 @@
     bugs.forEach(b => { b.g.visible = false; }); birds.forEach(b => { b.g.visible = false; });
     showMore(false);
   }
+
+  /* ---------- juego: las estrellas ---------- */
+  /* Estrellas escondidas (pedido de la dueña, 2026-09-21): al entrar al juego se esconden STAR_N estrellas doradas, la mitad
+     adentro de la casa y la mitad afuera, escogidas al azar entre los escondites de STAR_SPOTS. El niño las recoge al pasar por
+     ellas: suena un ding que sube de tono con cada una y pone cara feliz; la barra de arriba lleva la cuenta y el mapa muestra
+     las que faltan. Con la última suena una fanfarria, salta, sale una lluvia de estrellitas y un aviso con "Esconderlas otra
+     vez", que las vuelve a repartir. Solo se ponen donde el niño puede llegar: starReach() recorre el lote y la calle en una
+     cuadrícula de 20 cm desde el corredor con las mismas reglas de caminar (canStand, pushOut y no más de una grada de un paso),
+     así que siguen las capas prendidas (la calle hoy, el garaje con el boquete, la losa) y la casa movida. Cuelgan de house */
+  const STAR_N = 8, STAR_G = 0.2, STAR_UP = 0.55;              // cuántas, cuadrícula y a qué altura del piso flotan
+  const START = [3.54, 6.62];                                  // donde arranca el niño, en el corredor
+  // Escondites: [x, y] en el plano, o una función que da un punto del mundo (se pasa al plano con toPlan) o null si no aplica
+  const STAR_SPOTS = {
+    inside: [[1.2, 2.0], [1.4, 6.0], [0.45, 3.55], [4.65, 1.6], [3.6, 4.7], [5.3, 6.5], [2.5, 3.3], [4.9, 3.85]],
+    outside: [[3.5, -0.6], [0.8, -1.6], [-1.3, 3.0], [4.4, 7.6], [2.0, -4.5], [4.8, -6.2], [-2.2, -8.5], [3.2, -9.8],
+      () => [cm[0] + cn[0] * 2.5, cm[1] + cn[1] * 2.5],            // en la calle, abajo de la grada
+      () => (state.losa ? losaMid : null),                         // sobre la losa
+      () => (state.boq ? boqMid : null)],                          // en el garaje
+  };
+  const starShape = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.068 : 0.17;
+    if (i) starShape.lineTo(Math.cos(a) * r, Math.sin(a) * r); else starShape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  const starGeo = new THREE.ExtrudeGeometry(starShape, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 2 });
+  starGeo.center();
+  const goldM = std({ color: 0xFFC83D, emissive: 0xFF9F1A, emissiveIntensity: 0.5, roughness: .3, metalness: .35 });
+  // Un brillo suave detrás de cada estrella, que siempre mira a la cámara: así se ve aunque la estrella quede de canto al girar
+  const glowM = new THREE.SpriteMaterial({ map: tex(64, 64, g => {
+    const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    r.addColorStop(0, 'rgba(255,236,160,1)'); r.addColorStop(0.35, 'rgba(255,205,70,.55)'); r.addColorStop(1, 'rgba(255,190,40,0)');
+    g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+  }), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const makeStar = () => {
+    const mesh = new THREE.Mesh(starGeo, goldM), glow = new THREE.Sprite(glowM);
+    glow.scale.set(0.8, 0.8, 1); mesh.add(glow); mesh.castShadow = true; return mesh;
+  };
+  const starsG = new THREE.Group(); starsG.visible = false; house.add(starsG);
+  const starTpl = makeStar(); starTpl.visible = false; starsG.add(starTpl);   // para que warmUp prepare el dorado y el brillo
+  const STARS = [], sparks = [];
+  // Lo alcanzable se guarda mientras no cambien las capas, los muebles ni el sitio de la casa (recorrerlo toma unos 90 ms)
+  let reachKey = '', reachMemo = null;
+  function starReach() {
+    const key = [state.boq, state.losa, state.techo, state.furn, MOVE.front, MOVE.side, MOVE.turn].join();
+    if (key !== reachKey) { reachMemo = walkable(); reachKey = key; }
+    return reachMemo;
+  }
+  function walkable() {
+    // Hasta dónde buscar: el lote y la calle de enfrente, pasados al plano
+    const pts = LOT.concat(LOT.slice(0, 2).map(([x, z]) => [x + cn[0] * ROAD_W, z + cn[1] * ROAD_W])).map(([x, z]) => toPlan(x, z));
+    const x0 = Math.min(...pts.map(p => p[0])) - 0.5, y0 = Math.min(...pts.map(p => p[1])) - 0.5;
+    const nx = Math.ceil((Math.max(...pts.map(p => p[0])) + 0.5 - x0) / STAR_G) + 1, ny = Math.ceil((Math.max(...pts.map(p => p[1])) + 0.5 - y0) / STAR_G) + 1;
+    const ok = new Int8Array(nx * ny), floor = new Float32Array(nx * ny), seen = new Uint8Array(nx * ny);
+    const test = i => {                                        // 1 se puede pisar, −1 no (se calcula una sola vez por celda)
+      if (!ok[i]) {
+        const x = x0 + (i % nx) * STAR_G, y = y0 + Math.floor(i / nx) * STAR_G, [px, py] = pushOut(x, y);
+        ok[i] = Math.hypot(px - x, py - y) < 0.01 && canStand(x, y) ? 1 : -1;
+        if (ok[i] > 0) floor[i] = floorAt(x, y);
+      }
+      return ok[i] > 0;
+    };
+    const s0 = Math.round((START[0] - x0) / STAR_G) + Math.round((START[1] - y0) / STAR_G) * nx, q = [s0];
+    if (!test(s0)) return { x0, y0, nx, ny, seen, floor };
+    seen[s0] = 1;
+    for (let h = 0; h < q.length; h++) {
+      const i = q[h], cx = i % nx, cy = (i - cx) / nx;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ax = cx + dx, ay = cy + dy, j = ay * nx + ax;
+        if (ax < 0 || ay < 0 || ax >= nx || ay >= ny || seen[j] || !test(j)) continue;
+        const dh = floor[j] - floor[i];
+        if (dh > 0.26 || dh < -0.3) continue;                    // como walkBy: no sube ni baja más de una grada
+        seen[j] = 1; q.push(j);
+      }
+    }
+    return { x0, y0, nx, ny, seen, floor };
+  }
+  function clearStars() {
+    STARS.forEach(s => starsG.remove(s.mesh)); STARS.length = 0;
+    sparks.forEach(s => starsG.remove(s.mesh)); sparks.length = 0;
+    $('#fh-win').hidden = true;
+  }
+  function hideStars() {
+    clearStars();
+    const R = starReach(), pick = [];
+    const near = ([sx, sy]) => {                               // la celda alcanzable más cercana al escondite, hasta 0.8 m
+      let best = null, bd = 0.8;
+      const ci = Math.round((sx - R.x0) / STAR_G), cj = Math.round((sy - R.y0) / STAR_G);
+      for (let dj = -4; dj <= 4; dj++) for (let di = -4; di <= 4; di++) {
+        const i = ci + di, j = cj + dj;
+        if (i < 0 || j < 0 || i >= R.nx || j >= R.ny || !R.seen[j * R.nx + i]) continue;
+        const x = R.x0 + i * STAR_G, y = R.y0 + j * STAR_G, d = Math.hypot(x - sx, y - sy);
+        if (d < bd) { bd = d; best = [x, y, R.floor[j * R.nx + i]]; }
+      }
+      return best;
+    };
+    const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const apart = p => Math.hypot(p[0] - START[0], p[1] - START[1]) > 1.2 && pick.every(o => Math.hypot(p[0] - o[0], p[1] - o[1]) > 1.2);
+    ['inside', 'outside'].forEach(kind => {
+      const spots = shuffle(STAR_SPOTS[kind].map(s => { if (typeof s !== 'function') return s; const w = s(); return w ? toPlan(w[0], w[1]) : null; }).filter(Boolean));
+      let n = 0;
+      for (const s of spots) { if (n === STAR_N / 2) break; const c = near(s); if (c && apart(c)) { pick.push(c); n++; } }
+    });
+    pick.forEach(([x, y, floor], k) => {
+      const mesh = makeStar();
+      mesh.position.set(X(x), floor + STAR_UP, Z(y)); starsG.add(mesh);
+      STARS.push({ x, y, floor, mesh, got: false, ph: k * 1.3, pop: 0 });
+    });
+    starsG.visible = true; syncStars(false);
+  }
+  function syncStars(pop) {
+    const el = $('#fh-stars'), got = STARS.filter(s => s.got).length;
+    el.hidden = !STARS.length;
+    $('#fh-stars-n').textContent = `${got}/${STARS.length}`;
+    el.setAttribute('aria-label', `Estrellas: ${got} de ${STARS.length}`);
+    if (pop && !reduceMotion) { el.classList.remove('is-pop'); void el.offsetWidth; el.classList.add('is-pop'); }
+  }
+  // Un ding de dos notas que sube de tono con cada estrella, y la fanfarria de la última
+  function starDing(n) {
+    if (!sfxOk()) return;
+    const { ctx } = MUSIC, t = ctx.currentTime + 0.01;
+    [0, 7].forEach((iv, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), t0 = t + i * 0.08;
+      o.type = 'triangle'; o.frequency.value = midiHz(81 + n + iv);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.18, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
+      o.connect(g); g.connect(MUSIC.fx); o.start(t0); o.stop(t0 + 0.45);
+    });
+  }
+  function fanfare() {
+    if (!sfxOk()) return;
+    const { ctx } = MUSIC, t = ctx.currentTime + 0.02;
+    [[72, 0], [76, 0.12], [79, 0.24], [84, 0.36], [79, 0.52], [84, 0.64], [88, 0.8], [91, 0.8], [96, 0.8]].forEach(([m, dt0]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), t0 = t + dt0, len = dt0 >= 0.8 ? 1.1 : 0.2;
+      o.type = 'triangle'; o.frequency.value = midiHz(m);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.13, t0 + 0.015); g.gain.exponentialRampToValueAtTime(0.001, t0 + len);
+      o.connect(g); g.connect(MUSIC.fx); o.start(t0); o.stop(t0 + len + 0.05);
+    });
+  }
+  function collectStar(s) {
+    s.got = true; s.pop = 0;
+    const got = STARS.filter(q => q.got).length;
+    starDing(got); express('feliz', 1.2); syncStars(true);
+    if (got < STARS.length) return;
+    // ¡Todas! Fanfarria, un salto, lluvia de estrellitas y el aviso
+    fanfare(); jump();
+    for (let i = 0; i < 26; i++) {
+      const mesh = new THREE.Mesh(starGeo, goldM), a = Math.random() * Math.PI * 2, v = 0.8 + Math.random() * 1.4;
+      mesh.position.set(X(fr.x), fr.h + 1.0, Z(fr.y)); mesh.scale.setScalar(0.45); starsG.add(mesh);
+      sparks.push({ mesh, vx: Math.cos(a) * v, vy: 2.2 + Math.random() * 2, vz: Math.sin(a) * v, life: 1.4 + Math.random() * 0.6 });
+    }
+    $('#fh-win-t').textContent = `Encontraste las ${STARS.length} estrellas`;
+    $('#fh-win').hidden = false;
+  }
+  function starsStep(dt, t) {
+    for (const s of STARS) {
+      if (s.got) {                                             // al recogerla crece, sube, gira rápido y desaparece
+        if (s.pop < 1) {
+          s.pop = Math.min(1, s.pop + dt * 3);
+          s.mesh.scale.setScalar(1 + s.pop * 1.2); s.mesh.position.y = s.floor + STAR_UP + s.pop * 0.5; s.mesh.rotation.y += dt * 14;
+          if (s.pop === 1) s.mesh.visible = false;
+        }
+        continue;
+      }
+      s.mesh.rotation.y = t * 2.2 + s.ph; s.mesh.position.y = s.floor + STAR_UP + Math.sin(t * 2.6 + s.ph) * 0.06;
+      if (Math.hypot(fr.x - s.x, fr.y - s.y) < 0.34 && Math.abs(fr.h - s.floor) < 0.45) collectStar(s);
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i]; p.life -= dt; p.vy -= 5 * dt;
+      p.mesh.position.x += p.vx * dt; p.mesh.position.y += p.vy * dt; p.mesh.position.z += p.vz * dt;
+      p.mesh.rotation.y += dt * 8; p.mesh.scale.setScalar(Math.max(0.01, 0.45 * Math.min(1, p.life)));
+      if (p.life <= 0) { starsG.remove(p.mesh); sparks.splice(i, 1); }
+    }
+  }
+  function resetStars() { clearStars(); starsG.visible = false; syncStars(false); }
+  $('#fh-again').addEventListener('click', () => { hideStars(); canvas.focus({ preventScroll: true }); });
 
   const hud = $('#play-hud'), roomEl = $('#fh-room'), roofBtn = $('#fh-roof'), swapBtn = $('#fh-swap');
   const playBtn = $('#v-play'), playMenu = $('#play-menu');
@@ -5015,6 +5211,7 @@
       ballHome(4.3, 5.0); ball.visible = true;                    // la pelota espera en la sala
       dog.visible = true; dogHome();                               // Marshall llega con el niño
       playG.visible = true;                                        // la hamaca y el tobogán del patio
+      hideStars();                                                 // estrellas nuevas cada vez que se entra
       $('#fh-minimap').hidden = !WORLD.map;
       doorLimits();
       DOORS.forEach(d => { d.th = d.w = d.hold = d.pull = 0; d.leaf.rotation.y = d.rot0; });
@@ -5022,7 +5219,7 @@
       playFov();
       canvas.focus({ preventScroll: true });
     } else {
-      resetThings(); resetWorld(); dog.visible = playG.visible = false; kid.root.visible = false; playMusic(null);
+      resetThings(); resetWorld(); resetStars(); dog.visible = playG.visible = false; kid.root.visible = false; playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
       camera.fov = 42; camera.updateProjectionMatrix();
