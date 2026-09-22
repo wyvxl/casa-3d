@@ -161,7 +161,7 @@
 
   .fallback{position:fixed;inset:0;display:grid;place-items:center;padding:24px 16px;text-align:center;color:var(--ink-2)}
 
-  /* Jugar: el botón abre un submenú para escoger a Franco o a Alayna */
+  /* Jugar: el botón abre un submenú para escoger a Franco, a Alayna o a Amanda */
   .play{position:relative;display:flex}
   .views .play-btn,.views .play-btn:hover{color:var(--accent);border-right:0}
   .views .play-btn[aria-expanded="true"]{background:var(--accent);color:var(--paper)}
@@ -347,6 +347,7 @@
         <p class="sec-h">¿Con quién juegas?</p>
         <button type="button" class="pm-item" data-kid="franco"><i style="--c:#1F2124;--c2:#B04F6E"></i>Franco<small>camiseta negra</small></button>
         <button type="button" class="pm-item" data-kid="alayna"><i style="--c:#A9C8EE;--c2:#E0527A"></i>Alayna<small>vestido celeste</small></button>
+        <button type="button" class="pm-item" data-kid="amanda"><i style="--c:#30353F;--c2:#2E8C95"></i>Amanda<small>camiseta y bolso turquesa</small></button>
       </div>
     </div>
   </nav>
@@ -2914,7 +2915,185 @@
     };
     setOutfit(alayna, 'vestido');
   }
-  const KIDS = { franco, alayna };
+  /* Amanda (pedido de la dueña, 2026-09-21; fotos ../amanda.jpeg, ../amanda1.jpeg y ../amanda2.jpeg): un poco más grande que los
+     otros dos, 1.27 m, con la cabeza un poco más chica para el cuerpo. Piel clara con los cachetes rosados, ojos café, cejas
+     oscuras y rectas, cara tranquila; el pelo castaño oscuro muy rizado, larguísimo (le llega a media espalda y por delante le
+     cae sobre los hombros), con las puntas más claras. Dos mudas: la de la casa (camiseta ancha azul oscuro con el estampado
+     rosado adelante chiquito y atrás grande, short blanco de mezclilla deshilachado, el bolso turquesa cruzado y sandalias
+     negras de tiras) y la de la playa (camiseta gris de Nirvana, licra negra, bolsito tejido, lentes de sol y zuecos negros) */
+  const amanda = kidRig('Amanda', 0xE2B394, 1.18);
+  {
+    const { body, head, arms, legs, feet } = amanda;
+    head.scale.setScalar(0.9); head.position.y = 0.975;
+    const face = mood => faceTex('#E2B394', 'rgba(226,112,112,.5)', (g, soft) => {
+      const up = mood === 'sorpresa' ? 0.006 : 0;
+      [-1, 1].forEach(s => brow(g, s, 0.036, 0.046 + up, 50, mood === 'sorpresa' ? 10 : 5, '#2A1810', 5, 35));   // cejas oscuras, casi rectas
+      const [mx, my] = facePx(0, -0.047);
+      soft(mx, my + 28, 22, 'rgba(120,50,45,.1)');
+      if (mood === 'sorpresa') {
+        g.fillStyle = '#5A1E1E'; g.beginPath(); g.ellipse(mx, my + 6, 10, 12, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = '#C47C74'; g.lineWidth = 5; g.stroke();
+        return;
+      }
+      if (mood === 'feliz') {                                            // sonrisa con los dientes de arriba
+        const mouth = () => { g.beginPath(); g.moveTo(mx - 30, my - 4); g.quadraticCurveTo(mx, my + 2, mx + 30, my - 4); g.quadraticCurveTo(mx + 18, my + 20, mx, my + 21); g.quadraticCurveTo(mx - 18, my + 20, mx - 30, my - 4); };
+        g.fillStyle = '#5E1F1F'; mouth(); g.fill();
+        g.save(); mouth(); g.clip(); g.fillStyle = '#FBF8F2'; g.fillRect(mx - 32, my - 6, 64, 12); g.fillStyle = '#C0615C'; g.beginPath(); g.ellipse(mx, my + 17, 12, 5, 0, 0, Math.PI * 2); g.fill(); g.restore();
+        g.fillStyle = '#BE6F68'; g.beginPath(); g.moveTo(mx - 31, my - 4); g.quadraticCurveTo(mx - 12, my - 11, mx, my - 8); g.quadraticCurveTo(mx + 12, my - 11, mx + 31, my - 4); g.quadraticCurveTo(mx, my + 1, mx - 31, my - 4); g.fill();
+        return;
+      }
+      // Tranquila: la boca cerrada, el labio de arriba finito con su arco y el de abajo más lleno
+      g.fillStyle = '#B9716A'; g.beginPath(); g.moveTo(mx - 24, my); g.quadraticCurveTo(mx - 10, my - 8, mx, my - 5); g.quadraticCurveTo(mx + 10, my - 8, mx + 24, my);
+      g.quadraticCurveTo(mx, my + 2, mx - 24, my); g.fill();
+      const lg = g.createLinearGradient(0, my, 0, my + 14); lg.addColorStop(0, '#C07A72'); lg.addColorStop(1, '#D28D84');
+      g.fillStyle = lg; g.beginPath(); g.moveTo(mx - 22, my + 1); g.quadraticCurveTo(mx, my + 17, mx + 22, my + 1); g.quadraticCurveTo(mx, my + 4, mx - 22, my + 1); g.fill();
+      g.strokeStyle = 'rgba(100,40,36,.55)'; g.lineWidth = 2; g.beginPath(); g.moveTo(mx - 24, my + 0.5); g.quadraticCurveTo(mx, my + 3.5, mx + 24, my + 0.5); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.22)'; g.beginPath(); g.ellipse(mx + 3, my + 9, 6, 1.8, 0, 0, Math.PI * 2); g.fill();
+    });
+    amanda.faces = { normal: face('normal'), feliz: face('feliz'), sorpresa: face('sorpresa') };
+    amanda.faceMat = std({ map: amanda.faces.normal, roughness: .6 }); amanda.mood = 'normal';
+    kidPart(headGeo(0.005), amanda.faceMat, 0, 0, 0, head);
+    amanda.eyes = [-1, 1].map(s => kidEye(head, s, { iris: 0x4A2C18, skinM: amanda.skinM, lash: 0x160D08, lashW: 0.0015, lashes: true, open: -0.5 }));
+    kidPart(lathe([[0.1, 0.78], [0.1, 0.81], [0.094, 0.835], [0.076, 0.858], [0.053, 0.876], [0.042, 0.888]], 36), amanda.skinM, 0, 0, 0, body).scale.z = 0.74;
+    // Camiseta ancha (las dos mudas): larga hasta arriba del muslo y con manga hasta cerca del codo
+    const tee = (map, color) => {
+      const m = kidMat(0xffffff, { map, roughness: .92 }), trimM = kidMat(color, { roughness: .92 });
+      const torso = kidPart(lathe([[0.142, 0.44], [0.139, 0.47], [0.135, 0.5], [0.131, 0.53], [0.129, 0.56], [0.129, 0.6], [0.13, 0.64], [0.131, 0.68],
+        [0.13, 0.72], [0.127, 0.75], [0.123, 0.78], [0.115, 0.81], [0.101, 0.835], [0.081, 0.858], [0.058, 0.874], [0.046, 0.884]], 48), m, 0, 0, 0, body);
+      torso.rotation.y = Math.PI; torso.scale.z = 0.76;                        // el centro del lienzo, adelante
+      const collar = kidPart(new THREE.TorusGeometry(0.046, 0.007, 8, 28), trimM, 0, 0.879, 0, body); collar.rotation.x = Math.PI / 2; collar.scale.y = 0.8;
+      arms.forEach(a => {
+        kidPart(new THREE.SphereGeometry(0.052, 16, 12), trimM, 0, 0.004, 0, a);
+        kidPart(new THREE.CylinderGeometry(0.052, 0.06, 0.15, 16, 1, true), trimM, 0, -0.07, 0, a).material.side = THREE.DoubleSide;
+      });
+    };
+    const shorts = (m, len, r) => {
+      kidPart(lathe([[0.126, 0.43], [0.128, 0.46], [0.128, 0.5], [0.126, 0.53]], 36), m, 0, 0, 0, body).scale.z = 0.72;
+      legs.forEach(l => kidPart(new THREE.CylinderGeometry(r, r, len, 16, 1, true), m, 0, 0.02 - len / 2, 0, l).material.side = THREE.DoubleSide);
+    };
+    // Bolso cruzado: la correa de un hombro a la cadera del otro lado (s = 1: del hombro derecho a la cadera izquierda)
+    const crossBag = (s, bagGeo, bagM, strapM, strapW) => {
+      const bag = kidPart(bagGeo, bagM, s * 0.112, 0.47, 0.19, body); bag.rotation.set(-0.2, -s * 0.3, -s * 0.1);
+      const strap = kidPart(new THREE.BoxGeometry(strapW, 0.43, 0.006), strapM, s * 0.012, 0.68, 0.152, body); strap.rotation.set(0.3, 0, s * 0.62);
+      return bag;
+    };
+    // De la casa (../amanda.jpeg y ../amanda1.jpeg)
+    const casa = outfit(() => {
+      const t = tex(512, 256, (g, w, h, r) => {
+        g.fillStyle = '#30353F'; g.fillRect(0, 0, w, h);
+        speckle(g, w, h, r, 2600, ['rgba(255,255,255,.04)', 'rgba(0,0,0,.18)'], [1, 2]);
+        const pink = '#F2A9C9';
+        // Adelante, en el pecho a la izquierda de ella: una carita en un cuadrito y "Smiley" en letra de mano
+        g.strokeStyle = g.fillStyle = pink; g.lineWidth = 2.5; g.strokeRect(282, 62, 22, 18);
+        [288, 298].forEach(x => { g.beginPath(); g.arc(x, 69, 1.8, 0, Math.PI * 2); g.fill(); });
+        g.beginPath(); g.arc(293, 72, 5, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+        g.font = 'italic bold 15px Georgia, serif'; g.fillText('Smiley', 280, 98);
+        // Atrás (en las orillas del lienzo): letras grandes, estrellitas y un osito de trazo
+        const back = x0 => {
+          g.save(); g.translate(x0, 0);
+          g.font = 'bold 44px Georgia, serif'; g.textAlign = 'center'; g.fillText('SMILEY', 0, 70);
+          g.font = 'italic 20px Georgia, serif'; g.fillText('icons', -20, 100);
+          [[62, 48], [74, 72], [-66, 56]].forEach(([x, y]) => { g.save(); g.translate(x, y); g.beginPath(); for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5, R = k % 2 ? 3 : 8; g.lineTo(Math.sin(a) * R, -Math.cos(a) * R); } g.closePath(); g.fill(); g.restore(); });
+          g.lineWidth = 3; g.beginPath(); g.arc(0, 175, 30, 0, Math.PI * 2); g.stroke();              // el osito
+          [-24, 24].forEach(x => { g.beginPath(); g.arc(x, 148, 10, 0, Math.PI * 2); g.stroke(); });
+          g.beginPath(); g.arc(0, 150, 18, 0, Math.PI * 2); g.stroke();
+          [-7, 7].forEach(x => { g.beginPath(); g.arc(x, 146, 2.2, 0, Math.PI * 2); g.fill(); });
+          [-36, 36].forEach(x => { g.beginPath(); g.arc(x, 195, 9, 0, Math.PI * 2); g.stroke(); });
+          g.restore();
+        };
+        back(0); back(w);
+      }, 71);
+      t.wrapT = THREE.ClampToEdgeWrapping;
+      tee(t, 0x2B3039);
+      // Short blanco de mezclilla, con el ruedo deshilachado
+      const denim = tex(128, 64, (g, w, h, r) => { g.fillStyle = '#EEF0EE'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(150,165,175,.18)'; for (let i = -h; i < w; i += 3) { g.beginPath(); g.moveTo(i, h); g.lineTo(i + h, 0); g.stroke(); } }, 72);
+      shorts(kidMat(0xffffff, { map: denim, roughness: .9 }), 0.13, 0.071);
+      const fringe = tex(128, 16, (g, w, h, r) => { for (let x = 0; x < w; x += 2) { g.fillStyle = '#F4F4F2'; g.fillRect(x, 0, 1.4, 4 + r() * 12); } }, 73);
+      legs.forEach(l => { const m = kidPart(new THREE.CylinderGeometry(0.072, 0.074, 0.018, 16, 1, true), kidMat(0xffffff, { map: fringe, alphaTest: 0.5, side: THREE.DoubleSide }), 0, -0.117, 0, l); m.castShadow = false; });
+      // Bolso turquesa para el celular, de la correa ancha
+      const teal = kidMat(0x2E8C95, { roughness: .5 });
+      const bag = crossBag(1, new THREE.BoxGeometry(0.07, 0.12, 0.035), teal, teal, 0.03);
+      kidPart(new THREE.BoxGeometry(0.004, 0.1, 0.037), kidMat(0x1F6B72, { roughness: .4 }), 0.03, 0, 0, bag);    // el zíper
+      // Sandalias negras de plataforma con tiras
+      const black = kidMat(0x1A1A1C, { roughness: .6 });
+      feet.forEach(ft => {
+        kidPart(footGeo(1.02, 0.022, 0.003, -0.05), black, 0, 0, 0, ft);
+        kidPart(footGeo(0.92, 0.02, 0.008, -0.03), amanda.skinM, 0, 0, 0, ft);
+        [[0.0, 0.034, -0.014], [0.038, 0.031, -0.024], [0.074, 0.027, -0.03]].forEach(([z, R, y]) => {
+          const st = kidPart(new THREE.TorusGeometry(R, 0.005, 6, 18, Math.PI), black, 0, y, z, ft); st.scale.set(1.05, 0.9, 1.6);
+        });
+      });
+    });
+    // De la playa (../amanda2.jpeg)
+    const playa = outfit(() => {
+      const t = tex(512, 256, (g, w, h, r) => {
+        g.fillStyle = '#44464A'; g.fillRect(0, 0, w, h);
+        speckle(g, w, h, r, 3200, ['rgba(255,255,255,.05)', 'rgba(0,0,0,.16)'], [1, 3]);
+        g.fillStyle = g.strokeStyle = '#E9E6DF'; g.textAlign = 'center';
+        g.font = 'bold 34px Impact, "Arial Black", sans-serif'; g.fillText('NIRVANA', 256, 62);
+        const cx = 256, cy = 112; g.lineWidth = 4;
+        g.beginPath(); g.arc(cx, cy, 36, 0, Math.PI * 2); g.stroke();                     // la carita con los ojos en X y la lengua
+        [-13, 13].forEach(dx => { g.beginPath(); g.moveTo(cx + dx - 6, cy - 16); g.lineTo(cx + dx + 6, cy - 4); g.moveTo(cx + dx + 6, cy - 16); g.lineTo(cx + dx - 6, cy - 4); g.stroke(); });
+        g.beginPath(); g.moveTo(cx - 22, cy + 6); g.quadraticCurveTo(cx - 8, cy + 24, cx + 6, cy + 16); g.quadraticCurveTo(cx + 16, cy + 10, cx + 24, cy + 2); g.stroke();
+        g.beginPath(); g.ellipse(cx + 6, cy + 22, 6, 8, 0.3, 0, Math.PI); g.stroke();
+        g.font = 'bold 26px Impact, "Arial Black", sans-serif'; g.fillText('NEVERMIND', 256, 180);
+      }, 74);
+      t.wrapT = THREE.ClampToEdgeWrapping;
+      tee(t, 0x404246);
+      shorts(kidMat(0x151517, { roughness: .45 }), 0.17, 0.056);                         // licra negra
+      // Bolsito tejido de colores, de un cordón negro, en la cadera derecha
+      const woven = tex(64, 64, g => { ['#6B3A1E', '#E8DCC0', '#A0302A', '#1C1A18', '#C98B3A', '#E8DCC0', '#6B3A1E'].forEach((c, i) => { g.fillStyle = c; g.fillRect(0, i * 9.2, 64, 9.2); }); g.fillStyle = '#1C1A18'; for (let x = 0; x < 64; x += 8) { g.beginPath(); g.moveTo(x, 36); g.lineTo(x + 4, 30); g.lineTo(x + 8, 36); g.fill(); } });
+      const pouch = new THREE.CylinderGeometry(0.045, 0.045, 0.03, 20); pouch.rotateX(Math.PI / 2);
+      crossBag(-1, pouch, kidMat(0xffffff, { map: woven, roughness: .85 }), kidMat(0x151517, { roughness: .6 }), 0.007);
+      // Lentes de sol negros, de gato
+      const lensM = kidMat(0x0E0F12, { roughness: .08, metalness: .4 }), frameM = kidMat(0x111114, { roughness: .3 });
+      [-1, 1].forEach(s => {
+        const l = kidPart(new THREE.SphereGeometry(0.026, 18, 12), lensM, s * 0.036, 0.016, 0.1, head); l.scale.set(1.35, 0.95, 0.3); l.rotation.z = -s * 0.18;   // de gato: suben hacia afuera
+        const tp = kidPart(new THREE.BoxGeometry(0.006, 0.006, 0.095), frameM, s * 0.066, 0.02, 0.052, head); tp.rotation.y = s * 0.2;
+      });
+      kidPart(new THREE.BoxGeometry(0.02, 0.005, 0.006), frameM, 0, 0.022, 0.108, head);
+      // Zuecos negros de suela gruesa
+      const clog = kidMat(0x1C1C1F, { roughness: .55 });
+      feet.forEach(ft => { kidPart(footGeo(1.05, 0.026, 0.004, -0.05), clog, 0, 0, 0, ft); kidPart(footGeo(0.98, 0.024, 0.014, -0.026), clog, 0, 0, 0, ft); });
+    });
+    // Pelo rizado larguísimo: el casco con la raya y encima mechones en tirabuzón, que atrás llegan a media espalda y
+    // adelante caen sobre los hombros; las puntas más claras
+    const capTex = tex(256, 128, (g, w, h, r) => {
+      g.fillStyle = '#24160F'; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 700; i++) { const x = r() * w; g.strokeStyle = r() < .5 ? 'rgba(92,60,38,.35)' : 'rgba(10,5,3,.35)'; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + (r() - .5) * 10, h); g.stroke(); }
+      g.fillStyle = '#BE8A6A'; g.fillRect(60, 0, 3, 36);
+    }, 75);
+    const cap = kidPart(new THREE.SphereGeometry(0.108, 36, 20, 0, Math.PI * 2, 0, 1.5), std({ map: capTex, roughness: .6 }), 0, 0.003, -0.004, head);
+    cap.scale.set(1.04, 1.08, 1.05); cap.rotation.x = -0.72;                 // la frente despejada, el pelo para atrás
+    const r = rng(808), locks = [], dark = '#170E09', mid = '#2A1A10', light = '#4E301D';
+    const addCurls = (n, from, to, R0, width, c0, c1) => {
+      for (let i = 0; i < n; i++) {
+        const a = (from + (to - from) * (i + r() * 0.6) / n) * Math.PI / 180, A = Math.abs(a) * 180 / Math.PI;
+        const el = (A > 70 ? 0.15 : 0.55) + r() * 0.1;
+        const end = A > 112 ? -0.26 - r() * 0.12 : A > 70 ? -0.34 - r() * 0.08 : -0.42 - r() * 0.08;
+        const ph = r() * 6.3, fq = 36 + r() * 10, pts = [];
+        for (let k = 0; k <= 22; k++) {
+          const q = k / 22, y0 = Math.sin(el) * R0 * 1.05, y = y0 + (end - y0) * q;
+          const onHead = y > 0 ? Math.sqrt(Math.max(0, R0 * R0 - (y / 1.05) ** 2)) : R0;
+          const R = (y > 0 ? onHead : R0) + 0.01 + R0 * 0.45 * q * q + (A > 70 ? 0.07 * q : 0.02 * q);
+          const cr = 0.009 * Math.min(1, q * 2.5), aa = a + 0.08 * Math.sin(q * 4 + ph);
+          pts.push([Math.sin(aa) * R + cr * Math.cos(q * fq + ph), y + cr * 0.4 * Math.sin(q * fq * 0.5 + ph), -Math.cos(aa) * R + cr * Math.sin(q * fq + ph)]);
+        }
+        locks.push(lock(pts, width * (0.8 + r() * 0.4), c0, c1, 0.5, 60, 6));
+      }
+    };
+    addCurls(90, -130, 130, 0.108, 0.015, mid, light);                  // capa de afuera
+    addCurls(50, -112, 112, 0.098, 0.022, dark, mid);                   // capa de adentro, para que no se vea hueco
+    [[-1, 0.06], [1, 0.05]].forEach(([s, y]) => {                       // rizos sueltos junto a la cara
+      const pts = []; for (let k = 0; k <= 14; k++) { const q = k / 14; pts.push([s * (0.094 + 0.03 * q) + 0.008 * Math.cos(q * 22), y - 0.2 * q, 0.05 - 0.015 * q + 0.008 * Math.sin(q * 22)]); }
+      locks.push(lock(pts, 0.01, mid, light, 0.6, 40, 5));
+    });
+    amanda.hair = kidPart(mergeGeo(locks), hairMat(), 0, 0, 0, head);
+    amanda.outfits = { casa, playa };
+    setOutfit(amanda, 'casa');
+  }
+  const KIDS = { franco, alayna, amanda };
+  const KID_ORDER = ['franco', 'alayna', 'amanda'];
   let kid = franco;                                           // el que se está jugando
 
   const FR_R = 0.14;                                          // radio con que choca: los hombros de un niño de 5 años
@@ -3288,10 +3467,21 @@
       const k = Math.min(1, fr.jz / 0.15);
       [0, 1].forEach(i => { kid.legs[i].rotation.x = -0.55 * k; kid.knees[i].rotation.x = 1.0 * k; kid.arms[i].rotation.x = -1.1 * k; kid.elbows[i].rotation.x = -0.5; });
     }
-    // Saludo: sube el brazo derecho y mueve la mano de lado a lado
-    const wv = t < fr.waveEnd ? Math.min(1, (fr.waveEnd - t) / 0.25, (t - fr.waveEnd + 1.6) / 0.25) : 0;
-    kid.arms[0].rotation.z = -0.1 - 2.55 * wv; kid.elbows[0].rotation.z = Math.sin(t * 14) * 0.5 * wv;
-    if (wv) { kid.arms[0].rotation.x = -0.25 * wv; kid.elbows[0].rotation.x = -0.35 * wv; }
+    // Saludo: sube el brazo derecho y mueve la mano de lado a lado. Amanda, en vez de saludar, baila rapidito: rebota, mueve la
+    // cadera y la cabeza al ritmo y sube un brazo y después el otro
+    const wd = fr.waveDur || 1.6, wv = t < fr.waveEnd ? Math.min(1, (fr.waveEnd - t) / 0.25, (t - fr.waveEnd + wd) / 0.25) : 0;
+    if (wv && fr.who === 'amanda') {
+      const b = t * 15, up = 0.5 + 0.5 * Math.sin(b);
+      kid.body.position.y += Math.abs(Math.sin(b)) * 0.035 * wv;
+      kid.body.rotation.y = Math.sin(b * 0.5) * 0.4 * wv; kid.body.rotation.z = Math.sin(b) * 0.09 * wv;
+      kid.arms[0].rotation.z = -0.1 - 2.5 * up * wv; kid.arms[1].rotation.z = 0.1 + 2.5 * (1 - up) * wv;
+      [0, 1].forEach(i => { kid.arms[i].rotation.x = -0.3 * wv; kid.elbows[i].rotation.x = -0.9 * wv; kid.knees[i].rotation.x += 0.3 * wv * (0.5 + 0.5 * Math.sin(b + i * Math.PI)); });
+      kid.head.rotation.x = Math.sin(b) * 0.18 * wv;
+    } else {
+      kid.arms[0].rotation.z = -0.1 - 2.55 * wv; kid.elbows[0].rotation.z = Math.sin(t * 14) * 0.5 * wv;
+      kid.arms[1].rotation.z = 0.1; kid.body.rotation.z = 0;                          // lo que el baile de Amanda deja movido
+      if (wv) { kid.arms[0].rotation.x = -0.25 * wv; kid.elbows[0].rotation.x = -0.35 * wv; }
+    }
     // Acariciar a Marshall: se inclina y le pasa la mano izquierda
     const pet = t < fr.petEnd ? Math.min(1, (fr.petEnd - t) / 0.3, (t - fr.petEnd + 1.8) / 0.3) : 0;
     if (pet) { kid.body.rotation.x = 0.4 * pet; kid.arms[1].rotation.x = -0.9 * pet + Math.sin(t * 9) * 0.15 * pet; kid.elbows[1].rotation.x = -0.25 * pet; }
@@ -3351,7 +3541,12 @@
     rev.buffer = ir; rev.connect(master);
     const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), nd = noise.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-    return { ctx, master, fx, rev, noise };
+    // Distorsión para la guitarra de Amanda: se sube la señal, se recorta suave (tanh) y un filtro hace de parlante
+    const dist = ctx.createGain(), shaper = ctx.createWaveShaper(), cab = ctx.createBiquadFilter(), post = ctx.createGain(), curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++) curve[i] = Math.tanh((i / 511.5 - 1) * 3);
+    dist.gain.value = 9; shaper.curve = curve; shaper.oversample = '4x'; cab.type = 'lowpass'; cab.frequency.value = 3600; post.gain.value = 0.2;
+    dist.connect(shaper); shaper.connect(cab); cab.connect(post); post.connect(master);
+    return { ctx, master, fx, rev, noise, dist };
   }
   function audio() {
     if (!MUSIC.ctx) {
@@ -3365,7 +3560,7 @@
   // vol, a (ataque), d (caída), s (nivel que se sostiene, 0 = pulsada), r (se apaga), cut (filtro), rev (cuánto va al eco)
   function tone(t, m, dur, o) {
     const { ctx } = MUSIC, env = ctx.createGain(), lp = ctx.createBiquadFilter(), a = o.a || 0.005, r = o.r || 0.08, end = t + Math.max(a, dur);
-    lp.type = 'lowpass'; lp.frequency.value = o.cut || 6000; lp.connect(env); env.connect(MUSIC.master);
+    lp.type = 'lowpass'; lp.frequency.value = o.cut || 6000; lp.connect(env); env.connect(o.dist ? MUSIC.dist : MUSIC.master);
     if (o.rev) { const send = ctx.createGain(); send.gain.value = o.rev; env.connect(send); send.connect(MUSIC.rev); }
     env.gain.setValueAtTime(0.0001, t);
     env.gain.linearRampToValueAtTime(o.vol, t + a);
@@ -3450,6 +3645,28 @@
       },
     },
   };
+  /* Amanda (pedido de la dueña, 2026-09-21): rock, a 138 pulsos por minuto en mi menor. Batería con bombo, redoblante en el 2 y
+     el 4, charles en corcheas y platillo; bajo en corcheas; guitarra con distorsión tocando quintas (apagadas con la palma y
+     abiertas en los acentos) y, en la segunda vuelta, un solo en la pentatónica de mi */
+  SONGS.amanda = {
+    step: 60 / 138 / 2, per: 8,
+    chords: ['E', 'C', 'G', 'D', 'E', 'C', 'G', 'D'],
+    pc: { E: 40, C: 36, G: 43, D: 38 },
+    lead: [[], [], [], [],
+      [[0, 76, 2], [2, 74, 1], [3, 71, 1], [4, 74, 2], [6, 71, 2]], [[0, 79, 3], [3, 76, 1], [4, 74, 2], [6, 71, 2]],
+      [[0, 71, 2], [2, 74, 2], [4, 76, 2], [6, 79, 2]], [[0, 78, 4], [4, 76, 2], [6, 74, 1], [7, 71, 1]]],
+    play(bar, s, t, d) {
+      const r = this.pc[this.chords[bar]], open = s === 0 || s === 3 || s === 6;
+      if (s === 0 || s === 4 || s === 5 || (s === 7 && bar % 2)) kick(t, 0.85);
+      if (s === 2 || s === 6) { hiss(t, 0.34, 0.16, 'bandpass', 1800); tone(t, 52, 0.05, { type: 'triangle', vol: 0.2, s: 0, d: 0.06 }); }
+      hiss(t, s % 2 ? 0.035 : 0.07, 0.04, 'highpass', 8000);
+      if (s === 0 && bar % 4 === 0) hiss(t, 0.14, 1.1, 'highpass', 5200);                 // platillo
+      if (bar === 7 && s >= 4) hiss(t, 0.22, 0.1, 'bandpass', 1500 + s * 150);            // redoble antes de repetir
+      [0, 7, 12].forEach((iv, i) => tone(t, r + 12 + iv, d * (open ? 1.9 : 0.55), { type: 'sawtooth', vol: open ? 0.05 : 0.035, s: open ? 0.7 : 0.2, d: open ? 0.4 : 0.06, r: 0.05, cut: open ? 3000 : 1400, dist: 1, detune: i * 4 }));
+      tone(t, r, d * 0.9, { type: 'sawtooth', vol: 0.13, s: 0.6, d: 0.1, r: 0.04, cut: 650 });
+      this.lead[bar].forEach(([at, m, len]) => { if (at === s) tone(t, m, len * d * 0.95, { type: 'sawtooth', vol: 0.045, s: 0.8, d: 0.2, r: 0.1, cut: 3800, dist: 1, rev: 0.15, harm: [[1, 1], [2.005, 0.3]] }); });
+    },
+  };
   // Programa las notas que caen en los próximos 120 ms; corre cada 40 ms
   function musicTick() {
     const { ctx, song } = MUSIC; if (!song || !ctx) return;
@@ -3515,7 +3732,7 @@
   }
   function footstep(v) {
     if (!sfxOk()) return;
-    STEP[surfaceAt(fr.x, fr.y)](MUSIC.ctx.currentTime + 0.005, v, (fr.who === 'alayna' ? 1.15 : 0.85) * (0.95 + Math.random() * 0.1));
+    STEP[surfaceAt(fr.x, fr.y)](MUSIC.ctx.currentTime + 0.005, v, (fr.who === 'alayna' ? 1.15 : fr.who === 'amanda' ? 1.0 : 0.85) * (0.95 + Math.random() * 0.1));
   }
   // El pestillo: un clic corto y brillante
   function latch(t, vol) {
@@ -3733,7 +3950,10 @@
     if (ctxThing) ctxThing.act();
   }
   function jump() { if (fr.on && !fr.pose && fr.jz === 0) { fr.jv = 3.0; express('feliz', 0.8); } }
-  function wave() { if (fr.on && !fr.pose) { fr.waveEnd = performance.now() / 1000 + 1.6; express('feliz', 1.6); } }
+  function wave() {
+    if (!fr.on || fr.pose) return;
+    fr.waveDur = fr.who === 'amanda' ? 2.4 : 1.6; fr.waveEnd = performance.now() / 1000 + fr.waveDur; express('feliz', fr.waveDur);
+  }
   function fetchBall() {
     if (!fr.on) return;
     const x = fr.x + Math.sin(fr.yaw) * 0.45, y = fr.y + Math.cos(fr.yaw) * 0.45;
@@ -3785,7 +4005,7 @@
   // Cara que pone el niño por un rato: 'feliz' (patea, salta, saluda, se cambia de ropa) o 'sorpresa' (se topa con algo)
   function express(mood, dur) { fr.mood = mood; fr.moodEnd = performance.now() / 1000 + dur; }
   // Cambiarse de ropa en el ropero: la muda siguiente, con una vueltita, un tintineo y cara feliz
-  const OUTFIT_NAME = { casual: 'la camiseta', policia: 'el traje de policía', vestido: 'el vestido', gabby: 'el traje de Gabby' };
+  const OUTFIT_NAME = { casual: 'la camiseta', policia: 'el traje de policía', vestido: 'el vestido', gabby: 'el traje de Gabby', casa: 'la camiseta y el short', playa: 'la camiseta de Nirvana' };
   const nextOutfit = () => { const n = Object.keys(kid.outfits); return n[(n.indexOf(kid.outfitName) + 1) % n.length]; };
   function chime() {
     if (!sfxOk()) return;
@@ -4326,8 +4546,12 @@
   function setKid(who) {
     endPose(); kid.root.visible = false;
     fr.who = who; kid = KIDS[who]; kid.root.visible = fr.on;
-    const other = KIDS[who === 'franco' ? 'alayna' : 'franco'].name;
+    const other = KIDS[KID_ORDER[(KID_ORDER.indexOf(who) + 1) % KID_ORDER.length]].name;
     $('#fh-name').textContent = kid.name;
+    const wb = $('#act-wave'), dance = who === 'amanda';
+    if (!wb.dataset.wave) wb.dataset.wave = wb.innerHTML;
+    wb.innerHTML = dance ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path d="M9 9l11-2"/></svg>' : wb.dataset.wave;
+    wb.title = dance ? 'Bailar (Q)' : 'Saludar (Q)'; wb.setAttribute('aria-label', dance ? 'Bailar' : 'Saludar');
     swapBtn.title = `Cambiar a ${other}`; swapBtn.setAttribute('aria-label', `Jugando con ${kid.name}. Cambiar a ${other}`);
     if (fr.on) playMusic(who);                                // cada niño con su canción
   }
@@ -4366,7 +4590,7 @@
   playMenu.querySelectorAll('[data-kid]').forEach(b => b.addEventListener('click', () => { showMenu(false); setGame(true, b.dataset.kid); }));
   document.addEventListener('pointerdown', e => { if (!playMenu.hidden && !e.target.closest('#play')) showMenu(false); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !playMenu.hidden) { showMenu(false); playBtn.focus(); } });
-  swapBtn.addEventListener('click', () => setKid(fr.who === 'franco' ? 'alayna' : 'franco'));
+  swapBtn.addEventListener('click', () => setKid(KID_ORDER[(KID_ORDER.indexOf(fr.who) + 1) % KID_ORDER.length]));
   $('#fh-exit').addEventListener('click', () => setView(fr.prev));
   roofBtn.addEventListener('click', () => { setRoof(!state.roof); roofBtn.setAttribute('aria-pressed', String(state.roof)); });
 
