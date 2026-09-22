@@ -1601,6 +1601,7 @@
   let losaY = 0, losaMid = [0, 0];
   // Para el juego: las gradas del frente de la casa (LF, en el plano), los postes y las columnas de la losa y su planta (para el
   // mapa). fitLosaFront acomoda las gradas del frente cuando se mueve la casa
+  let HAM = null;                                                // la hamaca del techo de la losa (se arma con el patio de juegos)
   let LF = { x0: 0, x1: 0, y0: 0, depth: 0, n: 3, side: 0.3 }, losaPosts = [], losaCols = [], losaPoly = [], losaFront = null, fitLosaFront = () => {};
   {
     const conc = std({ color: 0xBEB9B1, map: T_concrete, roughness: .95 });
@@ -2962,6 +2963,7 @@
     if (state.boq ? vOf(p.x, p.z) < BOQ.depth + BOQ.wall + r && losaFloor(x, y, p) === null && !low : sIn(p.x, p.z) < GROUND.talud + r && !low) return false;
     if (state.losa && losaCols.some(([ox, oz]) => Math.hypot(p.x - ox, p.z - oz) < 0.18 + r)) return false;
     if (state.techo && losaPosts.some(([ox, oz]) => Math.hypot(p.x - ox, p.z - oz) < 0.08 + r)) return false;
+    if (state.techo && HAM && fr.h > losaY - 0.3 && Math.hypot(p.x - HAM.x, p.z - HAM.z) < 0.42 + r) return false;   // la hamaca
     return WOBST.every(([ox, oz, or]) => Math.hypot(p.x - ox, p.z - oz) > or + r);
   }
   // Lo saca de las paredes, las columnas y los muebles en los que quedó metido
@@ -3677,7 +3679,7 @@
   function applyPose(t) {
     const P = fr.pose, s = kid.root.scale.x;
     kid.head.rotation.set(0, 0, 0);
-    if (P.kind === 'swing' || P.kind === 'slide') { playPose(P, t); return; }
+    if (P.kind === 'swing' || P.kind === 'slide' || P.kind === 'hammock') { playPose(P, t); return; }
     if (P.kind === 'sit') {
       kid.root.position.set(X(P.hx), FL + P.seat + 0.02 - 0.52 * s, Z(P.hy)); kid.root.rotation.set(0, P.face, 0);
       kid.body.rotation.set(-0.12, 0, 0); kid.body.position.y = Math.sin(t * 2.4) * 0.003;
@@ -3999,6 +4001,51 @@
     Object.assign(playG.userData, { SW, SL });
   }
   const SWG = playG.userData.SW, SLD = playG.userData.SL;
+
+  /* Hamaca silla (pedido de la dueña, 2026-09-21): guindada del techo de la losa en la esquina del frente a la derecha, mirando
+     a la calle, a 1.05 m de la colindancia y 1.35 m hacia adentro sobre ella. Un gancho en el techo, dos mecates a los extremos
+     de una vara de madera de 0.95 m y de ahí la tela a rayas de colores, con el asiento a 0.42 m de la losa. Va en losaRoof, así
+     que se ve con la capa Techo losa (también fuera del juego). En el juego el niño se sube, se sienta y se mece despacio */
+  {
+    const [hx, hz] = [c1[0] - bw[0] * 1.05 + bu[0] * 1.35, c1[1] - bw[1] * 1.05 + bu[1] * 1.35];
+    const top = losaY + TECHO.low + (TECHO.high - TECHO.low) * vOf(hx, hz) / (BOQ.depth + BOQ.wall) - 0.03;
+    const L1 = 0.5, Ls = top - (losaY + 0.42);                                   // del gancho a la vara y al asiento
+    const woodM = kidMat(0x8A5A32, { roughness: .7 }), ropeM = kidMat(0xE8DCC0, { roughness: .95 }), steelM = kidMat(0x6B6F72, { roughness: .4, metalness: .6 });
+    const fabric = tex(32, 256, (g, w, h, r) => {
+      const cols = ['#C8322B', '#F2C230', '#2E8B57', '#2F6DB5', '#E67E22', '#FAF6EC', '#8E3F8F'];
+      for (let y = 0, i = 0; y < h; i++) { const hh = 8 + Math.floor(r() * 22); g.fillStyle = cols[i % cols.length]; g.fillRect(0, y, w, hh); y += hh; g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(0, y - 2, w, 1); }
+    }, 7);
+    fabric.repeat.set(1, 1.6);
+    addBox(0.14, 0.05, 0.14, woodM, hx, top + 0.005, hz, losaRoof);              // tacuco en el techo
+    const g = new THREE.Group(); g.position.set(hx, top - 0.02, hz); g.rotation.y = Math.atan2(cn[0], cn[1]); losaRoof.add(g);
+    const Q = (x, y, z) => new V3(x, y, z);
+    pipe(Q(0, 0.02, 0), Q(0, -0.08, 0), 0.012, steelM, g);                        // gancho
+    [-1, 1].forEach(k => pipe(Q(0, -0.08, 0), Q(k * 0.47, -L1, 0), 0.008, ropeM, g));
+    const bar = pipe(Q(-0.5, -L1, 0), Q(0.5, -L1, 0), 0.018, woodM, g);
+    // La tela: de la vara baja por el respaldo, hace el asiento y sube un poco adelante (perfil de Bézier en z, y), más angosta
+    // en el asiento y con la barriga que hace la tela en el medio
+    const prof = t => {
+      const a = [-0.02, -L1], b = [-0.16, -Ls * 0.72], c = [-0.08, -Ls - 0.16], d = [0.42, -Ls + 0.14], u = 1 - t;
+      return [u * u * u * a[0] + 3 * u * u * t * b[0] + 3 * u * t * t * c[0] + t * t * t * d[0], u * u * u * a[1] + 3 * u * u * t * b[1] + 3 * u * t * t * c[1] + t * t * t * d[1]];
+    };
+    const geo = new THREE.PlaneGeometry(1, 1, 10, 28), gp = geo.attributes.position, uv = geo.attributes.uv;
+    let seat = [0, 0];
+    for (let i = 0; i < gp.count; i++) {
+      const u = uv.getX(i), t = 1 - uv.getY(i), [z, y] = prof(t);
+      const wd = 0.92 - 0.24 * Math.sin(Math.min(1, t / 0.85) * Math.PI / 2) + 0.06 * Math.max(0, (t - 0.85) / 0.15);
+      gp.setXYZ(i, (u - 0.5) * wd, y - 0.05 * Math.sin(Math.PI * u) * Math.sin(Math.PI * t), z);
+      if (y < seat[1]) seat = [z, y];
+    }
+    geo.computeVertexNormals();
+    const cloth = new THREE.Mesh(geo, std({ map: fabric, roughness: .9, side: THREE.DoubleSide })); cloth.castShadow = cloth.receiveShadow = true; g.add(cloth);
+    const lip = prof(1);
+    [-1, 1].forEach(k => pipe(Q(k * 0.47, -L1, 0), Q(k * 0.39, lip[1], lip[0]), 0.007, ropeM, g));   // los mecates de los lados
+    bar.castShadow = true;
+    HAM = { g, x: hx, z: hz, L: Ls + 0.1, seat, amp: 0, t0: 0, cos: 1 };
+  }
+  const hamV = new V3(), hamQ = new THREE.Quaternion(), hamQ2 = new THREE.Quaternion();
+  // Dónde queda la hamaca en el plano de la casa (para el niño, que cuelga de house)
+  const hamPlan = () => { hamV.set(HAM.x, 0, HAM.z).sub(houseOff).applyAxisAngle(UPY, -houseYaw); return [hamV.x + W / 2, hamV.z + D / 2]; };
   // Soplido del tobogán: ruido que sube de tono mientras baja
   function whoosh() {
     if (!sfxOk()) return;
@@ -4017,6 +4064,26 @@
   // Poses del patio: columpiarse (la hamaca va y viene sola, cada vez más alto) y el tobogán (sube, se sienta y se tira)
   function playPose(P, t) {
     const s = kid.root.scale.x;
+    if (P.kind === 'hammock') {
+      // Sentado en la tela, recostado, agarrado de los mecates; la hamaca se mece despacio hacia la calle y hacia atrás
+      const w = Math.sqrt(9.8 / HAM.L), th = HAM.amp * Math.sin(w * (t - HAM.t0)), c = Math.cos(w * (t - HAM.t0));
+      HAM.g.rotation.x = th;
+      if (Math.sign(c) !== Math.sign(HAM.cos) && HAM.amp > 0.08 && sfxOk()) creak(MUSIC.ctx.currentTime + 0.01, 0.25, 0.02);   // el mecate cruje
+      HAM.cos = c;
+      HAM.g.updateMatrixWorld(true);
+      hamV.set(0, HAM.seat[1] + 0.06 - 0.52 * s, HAM.seat[0] + 0.04); HAM.g.localToWorld(hamV); house.worldToLocal(hamV);
+      kid.root.position.copy(hamV);
+      HAM.g.getWorldQuaternion(hamQ); house.getWorldQuaternion(hamQ2).invert(); kid.root.quaternion.copy(hamQ2.multiply(hamQ));
+      const sway = Math.sin(w * (t - HAM.t0));
+      [0, 1].forEach(i => {
+        kid.legs[i].rotation.x = -1.3 - 0.1 * sway; kid.knees[i].rotation.x = 1.25 + 0.25 * sway; kid.feet[i].rotation.x = 0.15;
+        kid.arms[i].rotation.x = -2.05; kid.arms[i].rotation.z = (i ? 1 : -1) * 0.45; kid.elbows[i].rotation.x = -0.45;
+      });
+      kid.body.rotation.set(-0.2, 0, 0); kid.head.rotation.y = Math.sin(t * 0.5) * 0.3;
+      HAM.amp = Math.min(0.2, HAM.amp + 0.04 / 60);
+      P.look = 0.75;
+      return;
+    }
     if (P.kind === 'swing') {
       const seat = P.seat, w = Math.sqrt(9.8 / SWG.L), th = seat.amp * Math.sin(w * (t - seat.t0));
       seat.g.rotation.x = th;
@@ -4070,10 +4137,15 @@
       act: () => { seat.t0 = performance.now() / 1000; seat.amp = Math.max(seat.amp, 0.15); startPose({ kind: 'swing', seat, cx: seat.x, cy: SWG.y + 0.25, look: 0.9 }); } })),
     { d: nearPoint(SLD.x, SLD.yLad - 0.3), r: 0.55, label: () => 'Tirarse por el tobogán', icon: () => 'slide',
       act: () => startPose({ kind: 'slide', t0: performance.now() / 1000, cx: SLD.x, cy: SLD.yLad - 0.18, look: 0.9 }) });
+  THINGS.push({ d: (x, y) => { if (!HAM || !state.techo || fr.h < losaY - 0.3) return 1e9; const [px, py] = hamPlan(); return Math.hypot(x - px, y - py); },
+    r: 0.85, label: () => 'Subirse a la hamaca', icon: () => 'hammock',
+    act: () => { HAM.t0 = performance.now() / 1000; HAM.amp = Math.max(HAM.amp, 0.06); const [px, py] = hamPlan(); startPose({ kind: 'hammock', cx: px, cy: py, look: 0.75 }); } });
+  ICONS.hammock = '<path d="M12 2v3M12 5 6 9M12 5l6 4M5 9h14"/><path d="M6.5 9c-.8 5 .5 9.5 5.5 10.5 3.2-.6 5.2-2.6 5.6-6"/><path d="M6.5 9l11.1 4.5"/><path d="M9 21.5h6"/>';
   ICONS.swing = '<path d="M3 4h18M7 4v11M17 4v11"/><path d="M5 15h4M15 15h4"/><path d="M12 4v7"/><circle cx="12" cy="13.5" r="2"/><path d="M9 19l3-3 3 3"/>';
   ICONS.slide = '<path d="M5 21V7h4v3M5 11h4M5 15h4"/><path d="M9 7c3 0 3 3 5 6s3 5 7 6"/><path d="M9 10c2.5 0 2.7 2.5 4.4 5.2S16 19.5 20 20.5"/>';
   // Las hamacas que quedan solas se van frenando
   function playStepIdle(dt, t) {
+    if (HAM && !(fr.pose && fr.pose.kind === 'hammock')) { HAM.amp *= Math.exp(-0.4 * dt); HAM.g.rotation.x = HAM.amp * Math.sin(Math.sqrt(9.8 / HAM.L) * (t - HAM.t0)); }
     SWG.seats.forEach(seat => {
       if (fr.pose && fr.pose.seat === seat) return;
       seat.amp *= Math.exp(-0.5 * dt);
