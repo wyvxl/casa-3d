@@ -1,4 +1,12 @@
+# Fotos, capturas y documentos: traen datos del lote y de la familia, así que no se publican.
+# Solo pasa la imagen de la vista previa de WhatsApp
 *.jpg
+*.jpeg
+*.png
+*.webp
+*.gif
+*.heic
+*.pdf
+!vista-previa.jpg
 README.md
 CLAUDE.md
-!vista-previa.jpg

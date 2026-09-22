@@ -211,7 +211,7 @@
   @keyframes loading-bar{from{transform:translateX(0)}to{transform:translateX(234%)}}
   @media (prefers-reduced-motion: reduce){ .loading{transition:none} .loading::after{animation:none;width:100%} }
 
-  /* Jugar: el botón abre un submenú para escoger a Franco, a Alayna o a Amanda */
+  /* Jugar: el botón abre un submenú para escoger a Franco, a Alayna, a Amanda o a Maritza */
   .play{position:relative;display:flex}
   .views .play-btn,.views .play-btn:hover{color:var(--accent);border-right:0}
   .views .play-btn[aria-expanded="true"]{background:var(--accent);color:var(--paper)}
@@ -1193,8 +1193,8 @@
   };
   /* Ubicación de la casa (pedido de la dueña, 2026-09-19): pegada al límite derecho visto desde la calle (colindancia 4-1) y lo más
      adelante posible, dejando al frente solo el boquete para un garaje a nivel de calle (capa Boquete, proyecto).
-     - side: separación de la colindancia al filo de afuera de nuestro techo (la canoa). Con 0.15 m la pared queda 0.31 m adentro,
-       nada del techo pasa al lote vecino y el alero del vecino, que sí se mete 0.50 m, no alcanza nuestro techo (ver README).
+     - side: separación de la colindancia al filo de afuera de nuestro techo (la canoa). Con 0.15 m las columnas quedan 0.315 m adentro,
+       nada del techo pasa al lote vecino y entre los dos aleros quedan 0.65 m (ver README).
      - BOQ, medido a lo largo de la colindancia 4-1 desde la calle: depth, fondo libre del boquete del lado derecho, que es el más
        corto porque la calle va sesgada (la dueña midió un garaje de 4.50 m donde un carro cabía bien); wall, grueso del muro de
        contención de atrás; gap, del muro al frente de la casa, para el talón del muro, el desagüe y conectar después la losa.
