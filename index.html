@@ -423,6 +423,7 @@
         <button type="button" class="pm-item" data-kid="franco"><i style="--c:#1F2124;--c2:#B04F6E"></i>Franco<small>camiseta negra</small></button>
         <button type="button" class="pm-item" data-kid="alayna"><i style="--c:#A9C8EE;--c2:#E0527A"></i>Alayna<small>vestido celeste</small></button>
         <button type="button" class="pm-item" data-kid="amanda"><i style="--c:#30353F;--c2:#2E8C95"></i>Amanda<small>camiseta y bolso turquesa</small></button>
+        <button type="button" class="pm-item" data-kid="maritza"><i style="--c:#1FA86B;--c2:#8FB2D5"></i>Maritza<small>blusa verde y jeans</small></button>
       </div>
     </div>
   </nav>
@@ -3483,20 +3484,291 @@
       locks.push(lock(pts, 0.01, mid, light, 0.6, 40, 5));
     });
     amanda.hair = kidPart(mergeGeo(locks), hairMat(), 0, 0, 0, head);
+    amanda.act = 'dance';                                               // su botón de Hola la pone a bailar
     amanda.outfits = { casa, playa };
     setOutfit(amanda, 'casa');
     return amanda;
   }
+  /* Maritza (pedido de la dueña, 2026-09-21; fotos ../Maritza.jpg y ../Maritza (2).jpg): la primera adulta del juego. Mide unos
+     1.55 m: es el mismo esqueleto de los niños agrandado 1.48 veces —así la cadera queda a 0.77 m y las poses de sentarse,
+     acostarse, columpiarse y el tobogán siguen sirviendo—, pero con proporciones de adulta: la cabeza más chica y más angosta
+     para el cuerpo, los hombros y el cuello más arriba y los brazos más largos. Es gruesa: busto y panza grandes, caderas
+     anchas, brazos y piernas llenos, y choca con un círculo más grande (r). Piel trigueña tostada, cara redonda y llena con
+     papada, ojos café oscuro un poco caídos, cejas delgadas, nariz ancha, labios delgados y las arrugas de la edad. Pelo
+     corto, oscuro con canas, con volumen arriba y el fleco hacia la derecha de ella. Jeans celestes desteñidos, tenis negros
+     de suela blanca y un reloj plateado en la muñeca izquierda. Dos mudas: la blusa verde de cuello en V con la manga
+     doblada (la foto de pie) y la blusa azul con el nudo en el escote, la cadenita y los lentes de sol subidos en la cabeza
+     (la foto en la sala). Su botón de acción (act = 'angry') la hace enojarse: se pone roja, aprieta los puños, patea el
+     piso y le sale humo de las orejas (ver playStep y steamStep) */
+  const bump = (v, c, w) => Math.exp(-(((v - c) / w) ** 2));
+  // Torso de adulta: un torno girado media vuelta (así el centro del lienzo queda adelante), achatado de adelante hacia atrás
+  // (depth) y con lo que sobresale según el ángulo a (0 = adelante) y la altura y. La costura de atrás se empareja
+  function adultTorso(pts, depth, bulge, seg = 64) {
+    const g = lathe(pts, seg); g.rotateY(Math.PI);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + bulge(Math.atan2(x, z), y) / (Math.hypot(x, z) || 1);
+      p.setXYZ(i, x * k, y, z * k * depth);
+    }
+    g.computeVertexNormals();
+    const n = g.attributes.normal, rows = pts.length, v = new V3();
+    for (let j = 0; j < rows; j++) {
+      const b = seg * rows + j; v.set(n.getX(j) + n.getX(b), n.getY(j) + n.getY(b), n.getZ(j) + n.getZ(b)).normalize();
+      n.setXYZ(j, v.x, v.y, v.z); n.setXYZ(b, v.x, v.y, v.z);
+    }
+    return g;
+  }
+  // Lo que sobresale del torso de Maritza (en metros del esqueleto): el busto en dos bultos a ±26° del frente, que la blusa
+  // deja caer hasta la panza (fall), la panza y las nalgas
+  const fullFigure = (bust, belly, seat, fall = 0.042) => (a, y) => {
+    const f = Math.max(0, Math.cos(a)), b = Math.max(0, -Math.cos(a));
+    return bust * bump(y, 0.742, y < 0.742 ? fall : 0.042) * (bump(a, 0.46, 0.4) + bump(a, -0.46, 0.4))
+      + belly * bump(y, 0.6, 0.085) * f * f + seat * bump(y, 0.475, 0.065) * b * b;
+  };
+  function makeMaritza() {
+    const m = kidRig('Maritza', 0xC38F6F, 1.48);
+    const { body, head, arms, elbows, legs, knees, feet } = m;
+    Object.assign(m, { adult: true, act: 'angry', r: 0.17, armOut: 0.26, waddle: 0.045, stride: 1.2, walk: 1.2, run: 1.9, jumpV: 2.2,
+      stepPitch: 0.72, lookH: 1.55, camUp: 1.35, poseUp: 0.3, squint: 0.25 });
+    // Proporciones de adulta: la cabeza más chica y angosta, los hombros más arriba, los brazos más largos (1.2) y abiertos
+    // por el cuerpo, y las piernas más separadas por la cadera ancha
+    head.scale.set(0.64, 0.7, 0.68); head.position.y = 0.968;
+    arms.forEach((a, i) => { const s = i ? 1 : -1; a.position.set(s * 0.135, 0.845, 0); a.scale.setScalar(1.2); a.rotation.z = s * m.armOut; });
+    legs.forEach((l, i) => { l.position.x = (i ? 1 : -1) * 0.074; });
+    const skin = m.skinM;
+    kidPart(new THREE.CylinderGeometry(0.05, 0.057, 0.11, 18), skin, 0, 0.885, 0, body);                      // cuello grueso
+    arms.forEach((a, i) => {                                            // brazos llenos y la mano de adulta
+      kidPart(new THREE.SphereGeometry(0.042, 14, 10), skin, 0, -0.004, 0, a);
+      kidPart(new THREE.CylinderGeometry(0.044, 0.034, 0.17, 16), skin, 0, -0.085, 0, a);
+      kidPart(new THREE.SphereGeometry(0.036, 12, 9), skin, 0, 0, 0, elbows[i]);
+      kidPart(new THREE.CylinderGeometry(0.033, 0.026, 0.15, 16), skin, 0, -0.075, 0, elbows[i]);
+      kidPart(new THREE.SphereGeometry(0.032, 14, 10), skin, 0, -0.186, 0.004, elbows[i]).scale.set(0.62, 1.2, 0.9);
+    });
+    // Reloj plateado en la muñeca izquierda
+    const silver = kidMat(0xC9CCD1, { roughness: .25, metalness: .8 });
+    kidPart(new THREE.TorusGeometry(0.0275, 0.0045, 6, 20), silver, 0, -0.143, 0, elbows[1]).rotation.x = Math.PI / 2;
+    kidPart(new THREE.CylinderGeometry(0.012, 0.012, 0.006, 18), silver, 0.029, -0.143, 0, elbows[1]).rotation.z = Math.PI / 2;
+    kidPart(new THREE.CylinderGeometry(0.0095, 0.0095, 0.002, 18), kidMat(0x2A2D33, { roughness: .1 }), 0.0325, -0.143, 0, elbows[1]).rotation.z = Math.PI / 2;
+
+    // La cara: redonda y llena, con papada; la nariz ancha de punta redonda y las orejas de adulta
+    const face = mood => faceTex('#C38F6F', 'rgba(180,85,70,.18)', (g, soft) => {
+      const r = rng(919), angry = mood === 'enojada', happy = mood === 'feliz';
+      const ln = (pts, w, c) => {
+        g.strokeStyle = c; g.lineWidth = w; g.lineCap = g.lineJoin = 'round'; g.beginPath();
+        pts.forEach(([x, y], i) => { const [px, py] = facePx(x, y); if (i) g.lineTo(px, py); else g.moveTo(px, py); }); g.stroke();
+      };
+      // El sol de toda la vida: manchitas en los pómulos y la frente, y la nariz más tostada
+      for (let i = 0; i < 30; i++) { const [px, py] = facePx((r() - 0.5) * 0.13, -0.035 + r() * 0.11); soft(px, py, 3 + r() * 6, 'rgba(115,60,38,.16)'); }
+      const [nx, ny] = facePx(0, -0.012); soft(nx, ny, 26, 'rgba(160,70,50,.12)');
+      [-1, 1].forEach(s => {
+        ln([[s * 0.02, -0.004], [s * 0.033, -0.012], [s * 0.048, -0.005]], 2.4, 'rgba(100,52,38,.32)');       // bolsas bajo los ojos
+        ln([[s * 0.023, -0.01], [s * 0.035, -0.018], [s * 0.05, -0.012]], 1.6, 'rgba(100,52,38,.18)');
+        [0.006, 0, -0.006].forEach(dy => ln([[s * 0.053, 0.012 + dy], [s * 0.063, 0.013 + dy * 1.7]], 1.6, 'rgba(100,52,38,.3)'));   // patas de gallo
+        // Surco de la nariz a la boca (más hondo si se ríe o se enoja) y las líneas de la boca a la barbilla
+        const deep = happy ? 1.4 : angry ? 1.3 : 1;
+        ln([[s * 0.021, -0.02], [s * 0.025, -0.035], [s * 0.027, -0.05]], 3 * deep, `rgba(100,50,36,${0.3 * deep})`);
+        const [fx, fy] = facePx(s * 0.03, -0.036); soft(fx, fy, 14, 'rgba(100,50,36,.12)');
+        ln([[s * 0.024, -0.057], [s * 0.027, -0.067], [s * 0.029, -0.077]], 2, 'rgba(100,50,36,.2)');
+        if (happy || angry) { const [cx, cy] = facePx(s * 0.047, -0.024); soft(cx, cy, 36, angry ? 'rgba(210,60,48,.3)' : 'rgba(185,85,70,.2)'); }
+      });
+      // Arrugas de la frente (casi tapadas por el fleco) y la sombra de la papada
+      [0.066, 0.076].forEach(y => ln([[-0.04, y - 0.002], [0, y + (angry ? -0.003 : 0.002)], [0.04, y - 0.002]], 1.8, 'rgba(100,52,38,.18)'));
+      const [cx, cy] = facePx(0, -0.086); soft(cx, cy, 40, 'rgba(100,50,36,.14)');
+      // Cejas delgadas, oscuras con canas. Enojada se juntan y bajan hacia la nariz, con las arrugas del ceño
+      [-1, 1].forEach(s => {
+        const [bx, by] = facePx(s * 0.036, 0.042);
+        g.save();
+        if (angry) { g.translate(bx, by); g.rotate(-s * 0.42); g.translate(-bx, -by + 4); }
+        brow(g, s, 0.036, 0.042 + (mood === 'sorpresa' ? 0.006 : 0), 48, angry ? 2 : 7, '#3A2C26', angry ? 4.6 : 2.8, 61);
+        g.restore();
+        if (angry) ln([[s * 0.006, 0.047], [s * 0.004, 0.034]], 2.2, 'rgba(95,45,32,.5)');
+      });
+      const [mx, my] = facePx(0, -0.05);
+      if (mood === 'sorpresa') {
+        g.fillStyle = '#4E1D18'; g.beginPath(); g.ellipse(mx, my + 6, 12, 15, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = '#A46356'; g.lineWidth = 4; g.stroke();
+      } else if (angry) {
+        // Hace trompa de brava: la boca estirada hacia abajo en las puntas, con los dientes apretados
+        const mouth = () => { g.beginPath(); g.moveTo(mx - 40, my + 10); g.quadraticCurveTo(mx - 24, my - 5, mx, my - 4); g.quadraticCurveTo(mx + 24, my - 5, mx + 40, my + 10); g.quadraticCurveTo(mx, my + 15, mx - 40, my + 10); };
+        g.fillStyle = '#4A1A16'; mouth(); g.fill(); g.save(); mouth(); g.clip();
+        g.fillStyle = '#EFE9DE'; g.fillRect(mx - 42, my - 6, 84, 8); g.fillRect(mx - 42, my + 4, 84, 12);
+        g.strokeStyle = 'rgba(120,108,96,.7)'; g.lineWidth = 1.2; [-24, -12, 0, 12, 24].forEach(d => { g.beginPath(); g.moveTo(mx + d, my - 6); g.lineTo(mx + d, my + 16); g.stroke(); });
+        g.fillStyle = 'rgba(60,20,16,.85)'; g.fillRect(mx - 42, my + 2, 84, 2.2);
+        g.restore(); g.strokeStyle = '#9A5A4E'; g.lineWidth = 3.4; mouth(); g.stroke();
+      } else {
+        // Boca cerrada: el labio de arriba delgado y el de abajo un poco más lleno. Seria, las comisuras caen un poco; feliz,
+        // suben en una sonrisa de boca cerrada, como en la foto de pie
+        const k = happy ? -1 : 1, w = happy ? 44 : 40;
+        g.fillStyle = '#9A5A4E'; g.beginPath(); g.moveTo(mx - w, my + 3 * k); g.quadraticCurveTo(mx - 18, my - 6, mx, my - 3.5);
+        g.quadraticCurveTo(mx + 18, my - 6, mx + w, my + 3 * k); g.quadraticCurveTo(mx, my + (happy ? 4 : 1.5), mx - w, my + 3 * k); g.fill();
+        const lg = g.createLinearGradient(0, my + 1, 0, my + 15); lg.addColorStop(0, '#A46356'); lg.addColorStop(1, '#B27265');
+        g.fillStyle = lg; g.beginPath(); g.moveTo(mx - w + 5, my + 3 * k + 0.5); g.quadraticCurveTo(mx, my + 15, mx + w - 5, my + 3 * k + 0.5); g.quadraticCurveTo(mx, my + (happy ? 5 : 3.5), mx - w + 5, my + 3 * k + 0.5); g.fill();
+        g.strokeStyle = 'rgba(78,34,26,.65)'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(mx - w - 2, my + 5 * k); g.quadraticCurveTo(mx - 20, my + (happy ? 5 : 1), mx, my + (happy ? 5 : 2)); g.quadraticCurveTo(mx + 20, my + (happy ? 5 : 1), mx + w + 2, my + 5 * k); g.stroke();
+        g.fillStyle = 'rgba(255,255,255,.15)'; g.beginPath(); g.ellipse(mx + 4, my + 9, 8, 2, 0, 0, Math.PI * 2); g.fill();
+      }
+    });
+    m.faces = { normal: face('normal'), feliz: face('feliz'), sorpresa: face('sorpresa'), enojada: face('enojada') };
+    m.faceMat = std({ map: m.faces.normal, roughness: .62 }); m.mood = 'normal';
+    kidPart(headGeo(0.01), m.faceMat, 0, 0, 0, head);
+    m.eyes = [-1, 1].map(s => kidEye(head, s, { iris: 0x24160E, skinM: skin, lash: 0x1C130E, lashW: 0.0013, lashes: false, open: -0.42 }));
+    m.eyes.forEach(e => e.lid.parent.parent.scale.setScalar(0.88));          // ojos de adulta, más chicos para la cara
+    kidPart(new THREE.SphereGeometry(0.06, 24, 16), skin, 0, -0.078, 0.028, head).scale.set(1, 0.5, 0.85);    // papada
+    kidPart(new THREE.SphereGeometry(0.0125, 16, 12), skin, 0, -0.02, 0.0948, head).scale.set(1.15, 0.85, 0.8);  // punta de la nariz
+    const nostrilM = kidMat(0x4A2218, { roughness: .9 });
+    [-1, 1].forEach(s => {
+      kidPart(new THREE.SphereGeometry(0.0078, 12, 10), skin, s * 0.0125, -0.0225, 0.089, head);              // aletas anchas
+      kidPart(new THREE.SphereGeometry(0.0026, 8, 6), nostrilM, s * 0.0062, -0.0292, 0.0955, head).scale.set(1.4, 0.6, 0.9);
+      kidPart(new THREE.SphereGeometry(0.027, 12, 10), skin, s * 0.094, -0.01, -0.006, head).scale.set(0.5, 1.1, 0.7);   // orejas
+    });
+
+    // Pelo corto, oscuro con canas: un casco pegado a la cabeza, echado para atrás (la frente libre arriba y la nuca tapada),
+    // y encima mechoncitos cortos que salen de la coronilla hacia afuera, con volumen arriba, las patillas cortas y el fleco
+    // peinado hacia la derecha de ella. Tres de cada diez mechones son canas, más en las sienes
+    const TILT = 0.66, CAPL = 1.53;
+    const capTex = tex(256, 128, (g, w, h, r) => {
+      g.fillStyle = '#29221F'; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 1500; i++) {
+        const x = r() * w, c = r(); g.strokeStyle = c < .28 ? 'rgba(170,164,158,.45)' : c < .6 ? 'rgba(10,8,7,.45)' : 'rgba(80,68,60,.4)';
+        g.lineWidth = 1; g.beginPath(); g.moveTo(x, r() * h * 0.4); g.lineTo(x + (r() - .5) * 8, h); g.stroke();
+      }
+    }, 95);
+    const cap = kidPart(new THREE.SphereGeometry(0.1035, 40, 22, 0, Math.PI * 2, 0, CAPL), std({ map: capTex, roughness: .75 }), 0, 0.002, -0.002, head);
+    cap.scale.set(1, 1.06, 1.03); cap.rotation.x = -TILT;
+    const rh = rng(929), tufts = [], hairAx = new V3(0, Math.cos(TILT), -Math.sin(TILT)), crown = new V3(0, 0.93, -0.37).normalize(), bangs = new V3(-0.8, -0.45, 0.2);
+    const onSkull = (v, off) => { const d = v.clone().normalize(), R = 0.1035 + off; return [d.x * R, d.y * R * 1.06, d.z * R * 1.03]; };
+    sphereDirs(520).forEach(([x, y, z]) => {
+      const d = new V3(x, y, z);
+      if (d.dot(hairAx) < Math.cos(CAPL - 0.1)) return;                 // solo donde hay pelo
+      const bang = z > 0.45 && y > 0.25, grey = rh() < (Math.abs(x) > 0.55 ? 0.45 : 0.28);
+      const t = d.clone().multiplyScalar(d.dot(crown)).sub(crown);        // lejos de la coronilla; el fleco, de lado y para abajo
+      if (bang) t.lerp(bangs, 0.7);
+      t.addScaledVector(d, -t.dot(d)).normalize();
+      const L = (bang ? 0.05 : 0.022 + 0.022 * Math.max(0, y)) * (0.8 + rh() * 0.4), vol = 0.004 + 0.012 * Math.max(0, y) ** 2, pts = [];
+      for (let k = 0; k <= 4; k++) { const s = k / 4; pts.push(onSkull(d.clone().addScaledVector(t, s * L / 0.1035), 0.002 + vol * Math.sin(Math.PI * Math.min(1, s * 1.3)) + 0.004 * s)); }
+      tufts.push(lock(pts, 0.0062 * (0.8 + rh() * 0.4), grey ? '#6F6A65' : '#1F1917', grey ? '#B2ACA6' : '#3B322E', 0.6, 8, 5, 0.5));
+    });
+    m.hair = kidPart(mergeGeo(tufts), hairMat(), 0, 0, 0, head);
+
+    // Jeans celestes desteñidos (en las dos fotos): más claros adelante, la sarga en diagonal y las costuras de hilo naranja
+    const denim = tex(128, 128, (g, w, h, r) => {
+      g.fillStyle = '#8CB0D4'; g.fillRect(0, 0, w, h);
+      const fade = g.createLinearGradient(0, 0, w, 0);
+      [[0, 'rgba(235,244,252,.35)'], [0.22, 'rgba(60,95,140,.12)'], [0.5, 'rgba(235,244,252,.12)'], [0.78, 'rgba(60,95,140,.12)'], [1, 'rgba(235,244,252,.35)']].forEach(([k, c]) => fade.addColorStop(k, c));
+      g.fillStyle = fade; g.fillRect(0, 0, w, h);
+      g.strokeStyle = 'rgba(50,80,125,.16)'; g.lineWidth = 1;
+      for (let i = -h; i < w; i += 3) { g.beginPath(); g.moveTo(i, h); g.lineTo(i + h, 0); g.stroke(); }
+      speckle(g, w, h, r, 900, ['rgba(255,255,255,.14)', 'rgba(40,70,110,.12)'], [1, 2]);
+      g.strokeStyle = 'rgba(205,150,80,.5)'; g.setLineDash([3, 3]); [32, 96].forEach(x => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }); g.setLineDash([]);
+    }, 93);
+    const jeans = kidMat(0xffffff, { map: denim, roughness: .9, side: THREE.DoubleSide });
+    kidPart(adultTorso([[0.116, 0.415], [0.14, 0.435], [0.151, 0.46], [0.155, 0.49], [0.154, 0.53], [0.15, 0.57], [0.146, 0.61]], 0.74, fullFigure(0, 0.02, 0.032)), jeans, 0, 0, 0, body);
+    legs.forEach((l, i) => {
+      kidPart(new THREE.CylinderGeometry(0.08, 0.068, 0.255, 18, 1, true), jeans, 0, -0.112, 0, l);
+      kidPart(new THREE.SphereGeometry(0.068, 14, 10), jeans, 0, 0, 0, knees[i]);
+      kidPart(new THREE.CylinderGeometry(0.066, 0.058, 0.21, 16, 1, true), jeans, 0, -0.1, 0, knees[i]);
+      kidPart(new THREE.CylinderGeometry(0.061, 0.064, 0.035, 16, 1, true), jeans, 0, -0.215, 0, knees[i]);     // el ruedo arrugado sobre el tenis
+      kidPart(new THREE.TorusGeometry(0.063, 0.006, 6, 20), jeans, 0, -0.232, 0, knees[i]).rotation.x = Math.PI / 2;
+    });
+    // Tenis negros de tela con suela blanca y cordones negros (foto en la sala)
+    feet.forEach(f => sneaker(f, { sole: 0xF2F0EA, upper: 0x1B1C1F, panel: 0x232428, toe: 0x1E1F23, lace: 0x2A2B2F }));
+    // Pecho, bajo el escote de las blusas
+    kidPart(adultTorso([[0.138, 0.72], [0.138, 0.755], [0.132, 0.79], [0.12, 0.82], [0.101, 0.843], [0.078, 0.862], [0.059, 0.877], [0.05, 0.895]], 0.74, fullFigure(0.036, 0, 0)), skin, 0, 0, 0, body);
+
+    // Blusa: suelta, cae del busto hasta la cadera y tapa la pretina del jeans. Tela con pliegues que caen, costuras a los
+    // lados y el ruedo pespunteado; el escote en V se recorta en el lienzo (vj: la fila del torno donde termina, 0 abajo y 1
+    // arriba; vw: el ancho arriba) y lleva un borde un poco más oscuro. extra pinta lo demás
+    const BLOUSE = [[0.16, 0.485], [0.16, 0.52], [0.156, 0.56], [0.152, 0.6], [0.149, 0.64], [0.147, 0.68], [0.147, 0.72], [0.146, 0.755],
+      [0.14, 0.79], [0.128, 0.82], [0.108, 0.843], [0.084, 0.862], [0.064, 0.877], [0.054, 0.886]];
+    const blouse = (base, fold, trim, vj, vw, extra, seed) => {
+      const t = tex(512, 256, (g, w, h, r) => {
+        g.fillStyle = base; g.fillRect(0, 0, w, h);
+        for (let i = 0; i < 26; i++) {
+          const x = r() * w, ww = 6 + r() * 22, gr = g.createLinearGradient(x - ww, 0, x + ww, 0);
+          gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, r() < .55 ? fold : 'rgba(255,255,255,.07)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+          g.fillStyle = gr; g.fillRect(x - ww, h * 0.3, 2 * ww, h * 0.7);
+        }
+        speckle(g, w, h, r, 2000, ['rgba(255,255,255,.035)', 'rgba(0,0,0,.08)'], [1, 2]);
+        g.fillStyle = 'rgba(0,0,0,.1)'; [128, 384].forEach(x => g.fillRect(x - 1, 0, 2, h));
+        g.strokeStyle = 'rgba(0,0,0,.18)'; g.setLineDash([4, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, h - 8); g.lineTo(w, h - 8); g.stroke(); g.setLineDash([]);
+        const vy = (1 - vj) * h, V = k => { g.beginPath(); g.moveTo(w / 2 - vw * w - k, -2); g.lineTo(w / 2, vy + k); g.lineTo(w / 2 + vw * w + k, -2); g.closePath(); };
+        g.fillStyle = trim; V(7); g.fill();
+        if (extra) extra(g, w, h, vy);
+        g.globalCompositeOperation = 'destination-out'; V(0); g.fill(); g.globalCompositeOperation = 'source-over';
+      }, seed);
+      t.wrapT = THREE.ClampToEdgeWrapping;
+      kidPart(adultTorso(BLOUSE, 0.74, fullFigure(0.042, 0.035, 0.035, 0.11)), std({ map: t, roughness: .75, side: THREE.DoubleSide, alphaTest: 0.5 }), 0, 0, 0, body);
+    };
+    // La verde (foto de pie): cuello en V con su costura al centro y manga corta ancha, doblada en el ruedo
+    const verde = outfit(() => {
+      blouse('#1FA86B', 'rgba(0,45,22,.13)', '#178A57', 8.4 / 13, 0.085, (g, w, h, vy) => {
+        g.strokeStyle = 'rgba(0,50,25,.28)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(w / 2, vy); g.lineTo(w / 2, vy + 34); g.stroke();
+      }, 97);
+      const green = kidMat(0x1C9E64, { roughness: .75 }), cuff = kidMat(0x178A57, { roughness: .75 });
+      arms.forEach(a => {
+        kidPart(new THREE.SphereGeometry(0.052, 16, 12), green, 0, -0.012, 0, a);
+        kidPart(new THREE.CylinderGeometry(0.057, 0.06, 0.1, 18, 1, true), green, 0, -0.058, 0, a).material.side = THREE.DoubleSide;
+        kidPart(new THREE.TorusGeometry(0.06, 0.01, 8, 22), cuff, 0, -0.106, 0, a).rotation.x = Math.PI / 2;
+      });
+    });
+    // La azul (foto en la sala): escote más cerrado con un nudo de la misma tela, la cadenita plateada y manga corta; los
+    // lentes de sol de carey con los vidrios color miel, subidos en la cabeza
+    const azul = outfit(() => {
+      blouse('#1E80DA', 'rgba(0,20,60,.15)', '#1868B5', 9.5 / 13, 0.07, (g, w, h, vy) => {
+        g.strokeStyle = 'rgba(0,20,60,.3)'; g.lineWidth = 1.4;                        // frunces que salen del nudo
+        [-1, 1].forEach(s => [0, 1, 2].forEach(k => { g.beginPath(); g.moveTo(w / 2 + s * 6, vy + 4); g.quadraticCurveTo(w / 2 + s * (18 + k * 10), vy + 14 + k * 6, w / 2 + s * (26 + k * 16), vy + 30 + k * 12); g.stroke(); }));
+        g.strokeStyle = 'rgba(222,224,230,.95)'; g.lineWidth = 1.4;                  // la cadenita
+        g.beginPath(); g.moveTo(w / 2 - 0.07 * w - 16, 0); g.quadraticCurveTo(w / 2, vy + 50, w / 2 + 0.07 * w + 16, 0); g.stroke();
+      }, 98);
+      const blue = kidMat(0x1B79CF, { roughness: .7 });
+      [-1, 1].forEach(s => { const k = kidPart(new THREE.SphereGeometry(0.014, 12, 9), blue, s * 0.011, 0.828, 0.092, body); k.scale.set(1.5, 0.8, 0.6); k.rotation.z = s * 0.5; });
+      kidPart(new THREE.SphereGeometry(0.0095, 10, 8), blue, 0, 0.826, 0.097, body);
+      arms.forEach(a => {
+        kidPart(new THREE.SphereGeometry(0.052, 16, 12), blue, 0, -0.012, 0, a);
+        kidPart(new THREE.CylinderGeometry(0.056, 0.064, 0.125, 18, 1, true), blue, 0, -0.06, 0, a).material.side = THREE.DoubleSide;
+        kidPart(new THREE.TorusGeometry(0.064, 0.004, 6, 22), blue, 0, -0.122, 0, a).rotation.x = Math.PI / 2;
+      });
+      // Los lentes se arman puestos (a la altura de los ojos) y se giran hacia arriba sobre un eje encima de las orejas
+      const sg = new THREE.Group(); sg.position.set(0, 0.022, -0.012); sg.rotation.x = -0.95; head.add(sg);
+      const frameM = kidMat(0x5A3419, { roughness: .35 }), lensM = std({ color: 0xC0772E, roughness: .1, metalness: .3, transparent: true, opacity: .75 });
+      [-1, 1].forEach(s => {
+        kidPart(new THREE.SphereGeometry(0.024, 18, 12), lensM, s * 0.036, -0.01, 0.104, sg).scale.set(1.3, 0.95, 0.28);
+        kidPart(new THREE.TorusGeometry(0.026, 0.0028, 6, 24), frameM, s * 0.036, -0.01, 0.104, sg).scale.set(1.2, 0.9, 1);
+        kidPart(new THREE.BoxGeometry(0.005, 0.005, 0.11), frameM, s * 0.071, -0.004, 0.05, sg).rotation.y = s * 0.12;
+      });
+      kidPart(new THREE.BoxGeometry(0.02, 0.004, 0.005), frameM, 0, -0.002, 0.107, sg);
+    });
+    m.outfits = { verde, azul };
+    setOutfit(m, 'verde');
+
+    // Enojada se pone roja: la piel y la cara se van al rojo según k (0 a 1)
+    const skinBase = skin.color.clone(), skinRed = new THREE.Color(0xD2604E);
+    m.flush = k => { skin.color.copy(skinBase).lerp(skinRed, k * 0.75); m.faceMat.color.setRGB(1, 1 - 0.36 * k, 1 - 0.42 * k); };
+    // El humo de las orejas: bolitas que salen de lado, suben, crecen y se desvanecen (steamStep). Van en house, no en ella,
+    // para que suban derecho aunque ella se mueva
+    const steam = { g: new THREE.Group(), parts: [], acc: 0, side: 0,
+      ears: [-1, 1].map(s => { const o = new THREE.Object3D(); o.position.set(s * 0.1, -0.006, -0.004); head.add(o); return o; }) };
+    house.add(steam.g);
+    const puff = new THREE.IcosahedronGeometry(1, 2);
+    for (let i = 0; i < 48; i++) {
+      const p = new THREE.Mesh(puff, std({ color: 0xF4F4F2, roughness: 1, transparent: true, opacity: 0, depthWrite: false }));
+      p.visible = false; p.raycast = () => {}; p.userData.noPick = true; steam.g.add(p);
+      steam.parts.push({ mesh: p, life: 0, max: 1, vx: 0, vy: 0, vz: 0 });
+    }
+    m.steam = steam;
+    return m;
+  }
   /* Cada niño se arma la primera vez que se juega con él (2026-09-21): los tres juntos eran casi la mitad del arranque de la
      página, aunque no se entrara al juego. kidOf lo arma si todavía no está; mientras, startGame muestra "Preparando el juego" */
-  const KID_MAKE = { franco: makeFranco, alayna: makeAlayna, amanda: makeAmanda };
-  const KID_NAME = { franco: 'Franco', alayna: 'Alayna', amanda: 'Amanda' };
+  const KID_MAKE = { franco: makeFranco, alayna: makeAlayna, amanda: makeAmanda, maritza: makeMaritza };
+  const KID_NAME = { franco: 'Franco', alayna: 'Alayna', amanda: 'Amanda', maritza: 'Maritza' };
   const KIDS = {};
   const kidOf = who => KIDS[who] || (KIDS[who] = KID_MAKE[who]());
-  const KID_ORDER = ['franco', 'alayna', 'amanda'];
+  const KID_ORDER = ['franco', 'alayna', 'amanda', 'maritza'];
   let kid = null;                                             // el que se está jugando (ninguno hasta entrar al juego)
 
-  const FR_R = 0.14;                                          // radio con que choca: los hombros de un niño de 5 años
+  // Radio con que choca: los hombros de un niño de 5 años. Maritza, que es adulta y gruesa, choca con uno más grande (su r);
+  // setKid lo cambia
+  let FR_R = 0.14;
   const LOOK_H = 1.15;                                        // la cámara mira un poco sobre su cabeza, para que él quede abajo
   const fr = { on: false, who: 'franco', blinkAt: 0, blinkEnd: 0, jz: 0, jv: 0, waveEnd: 0, petEnd: 0, speed: 0, pose: null, mood: 'normal', moodEnd: 0, bump: 0, spinEnd: 0, x: 0, y: 0, h: FL, yaw: 0, yawT: 0, camYaw: 0, pitch: 0.3, dist: 2.3, camD: 2.3, phase: 0, amp: 0,
     wantX: 0, wantY: 0, prev: 'exterior', fly: null, room: '', look: new V3() };
@@ -3881,7 +4153,7 @@
           break;
         }
       }
-      const step = mag * (run ? 2.4 : 1.5) * dt;
+      const step = mag * (run ? kid.run || 2.4 : kid.walk || 1.5) * dt;
       walkBy(wx * step, wy * step);
       // Si camina con ganas y no avanza (se topó con algo), pone cara de sorpresa
       fr.bump = step > 0.015 && Math.hypot(fr.x - x0, fr.y - y0) < step * 0.3 ? fr.bump + dt : 0;
@@ -3897,9 +4169,9 @@
     const moved = fr.pose ? 0 : Math.hypot(fr.x - x0, fr.y - y0), speed = moved / Math.max(dt, 1e-3);
     fr.speed = speed;
     const foot = Math.floor(fr.phase / Math.PI);
-    fr.phase += moved * Math.PI * 2 / 0.9;
+    fr.phase += moved * Math.PI * 2 / (kid.stride || 0.9);
     if (Math.floor(fr.phase / Math.PI) !== foot && fr.amp > 0.15) footstep(0.45 + 0.55 * Math.min(1, speed / 2.4));   // pisó un pie
-    fr.amp += (Math.min(1, speed / 1.5) - fr.amp) * Math.min(1, dt * 10);
+    fr.amp += (Math.min(1, speed / (kid.walk || 1.5)) - fr.amp) * Math.min(1, dt * 10);
     fr.yaw += Math.atan2(Math.sin(fr.yawT - fr.yaw), Math.cos(fr.yawT - fr.yaw)) * Math.min(1, dt * 12);
     const A = fr.amp, ph = fr.phase, sn = Math.sin(ph), cs = Math.cos(ph), sw = sn * 0.55 * A, still = 1 - A;
     [sw, -sw].forEach((hip, i) => {
@@ -3915,9 +4187,11 @@
     if (t > fr.blinkAt) { fr.blinkEnd = t + 0.16; fr.blinkAt = t + 2 + Math.random() * 3; }
     const blink = t < fr.blinkEnd ? 1 - Math.abs((fr.blinkEnd - t) / 0.08 - 1) : 0;   // baja y sube el párpado
     // Ánimo: el que pidió express mientras dura; si no, feliz corriendo y normal lo demás. Feliz achina los ojos; sorpresa los abre
-    const mood = t < fr.moodEnd ? fr.mood : fr.speed > 2.0 ? 'feliz' : 'normal';
-    if (kid.mood !== mood) { kid.mood = mood; kid.faceMat.map = kid.faces[mood]; }
-    kid.eyes.forEach(e => { e.lid.rotation.x = e.open + (mood === 'feliz' ? 0.45 : mood === 'sorpresa' ? -0.12 : 0) + 2.0 * blink; });
+    // Maritza, enojada, frunce los ojos
+    const mood = t < fr.moodEnd ? fr.mood : fr.speed > (kid.run || 2.4) * 0.83 ? 'feliz' : 'normal';
+    if (kid.mood !== mood) { kid.mood = mood; kid.faceMat.map = kid.faces[mood] || kid.faces.normal; }
+    const lidK = mood === 'feliz' ? (kid.squint == null ? 0.45 : kid.squint) : mood === 'sorpresa' ? -0.12 : mood === 'enojada' ? 0.24 : 0;
+    kid.eyes.forEach(e => { e.lid.rotation.x = e.open + lidK + 2.0 * blink; });
     if (kid.skirt) { kid.skirt.rotation.x = -0.05 * A + Math.sin(ph * 2) * 0.025 * A; kid.skirt.rotation.z = sn * 0.03 * A; }
     if (kid.hair) kid.hair.rotation.x = 0.06 * A + Math.sin(ph * 2) * 0.012 * A;
     // Salto: sube a 3 m/s y cae con la gravedad; en el aire encoge las piernas y sube los brazos
@@ -3928,20 +4202,41 @@
       [0, 1].forEach(i => { kid.legs[i].rotation.x = -0.55 * k; kid.knees[i].rotation.x = 1.0 * k; kid.arms[i].rotation.x = -1.1 * k; kid.elbows[i].rotation.x = -0.5; });
     }
     // Saludo: sube el brazo derecho y mueve la mano de lado a lado. Amanda, en vez de saludar, baila rapidito: rebota, mueve la
-    // cadera y la cabeza al ritmo y sube un brazo y después el otro
+    // cadera y la cabeza al ritmo y sube un brazo y después el otro. Maritza se enoja. Quietos, los brazos cuelgan un poco
+    // abiertos (armOut; Maritza más, por el cuerpo) y Maritza se bambolea al caminar (waddle)
     const wd = fr.waveDur || 1.6, wv = t < fr.waveEnd ? Math.min(1, (fr.waveEnd - t) / 0.25, (t - fr.waveEnd + wd) / 0.25) : 0;
-    if (wv && fr.who === 'amanda') {
+    const act = kid.act || 'wave', out = kid.armOut || 0.1;
+    kid.arms[0].rotation.z = -out; kid.arms[1].rotation.z = out; kid.elbows[0].rotation.z = 0;
+    kid.body.rotation.z = kid.waddle ? sn * kid.waddle * A : 0;
+    if (wv && act === 'dance') {
       const b = t * 15, up = 0.5 + 0.5 * Math.sin(b);
       kid.body.position.y += Math.abs(Math.sin(b)) * 0.035 * wv;
       kid.body.rotation.y = Math.sin(b * 0.5) * 0.4 * wv; kid.body.rotation.z = Math.sin(b) * 0.09 * wv;
       kid.arms[0].rotation.z = -0.1 - 2.5 * up * wv; kid.arms[1].rotation.z = 0.1 + 2.5 * (1 - up) * wv;
       [0, 1].forEach(i => { kid.arms[i].rotation.x = -0.3 * wv; kid.elbows[i].rotation.x = -0.9 * wv; kid.knees[i].rotation.x += 0.3 * wv * (0.5 + 0.5 * Math.sin(b + i * Math.PI)); });
       kid.head.rotation.x = Math.sin(b) * 0.18 * wv;
-    } else {
-      kid.arms[0].rotation.z = -0.1 - 2.55 * wv; kid.elbows[0].rotation.z = Math.sin(t * 14) * 0.5 * wv;
-      kid.arms[1].rotation.z = 0.1; kid.body.rotation.z = 0;                          // lo que el baile de Amanda deja movido
-      if (wv) { kid.arms[0].rotation.x = -0.25 * wv; kid.elbows[0].rotation.x = -0.35 * wv; }
+    } else if (wv && act === 'angry') {
+      // Maritza se enoja: aprieta los puños y los sacude frente al pecho, tiembla, mueve la cabeza que no, y patea el piso
+      // tres veces con el pie derecho (si está quieta). La cara se pone roja (flush) y le sale humo de las orejas (steamStep)
+      const T = t - (fr.waveEnd - wd), shake = Math.sin(t * 32);
+      [0, 1].forEach(i => {
+        kid.arms[i].rotation.x = (-0.9 + shake * (i ? -0.12 : 0.12)) * wv; kid.arms[i].rotation.z = (i ? 1 : -1) * (out + 0.22 * wv);
+        kid.elbows[i].rotation.x = -1.8 * wv;
+      });
+      const k = Math.floor((T - 0.5) / 0.75), st = T - 0.5 - k * 0.75, stomping = T > 0.5 && k < 3 && A < 0.3;
+      if (stomping) {
+        const lift = Math.sin(Math.min(1, st / 0.5) * Math.PI);
+        kid.legs[0].rotation.x = -0.55 * lift; kid.knees[0].rotation.x = 0.9 * lift; kid.feet[0].rotation.x = 0.25 * lift;
+        if (st >= 0.5 && fr.stomp !== k) { fr.stomp = k; stompSound(); }
+      }
+      kid.body.rotation.x = 0.1 * wv; kid.body.rotation.z = Math.sin(t * 41) * 0.02 * wv;
+      kid.head.rotation.x = -0.08 * wv; kid.head.rotation.y = Math.sin(t * 8) * 0.15 * wv;
+    } else if (wv) {
+      kid.arms[0].rotation.z = -out - 2.55 * wv; kid.elbows[0].rotation.z = Math.sin(t * 14) * 0.5 * wv;
+      kid.arms[0].rotation.x = -0.25 * wv; kid.elbows[0].rotation.x = -0.35 * wv;
     }
+    steamStep(dt, act === 'angry' && wv > 0.3 && t - (fr.waveEnd - wd) > 0.4);
+    if (kid.flush) kid.flush(act === 'angry' ? wv : 0);
     // Acariciar a Marshall: se inclina y le pasa la mano izquierda
     const pet = t < fr.petEnd ? Math.min(1, (fr.petEnd - t) / 0.3, (t - fr.petEnd + 1.8) / 0.3) : 0;
     if (pet) { kid.body.rotation.x = 0.4 * pet; kid.arms[1].rotation.x = -0.9 * pet + Math.sin(t * 9) * 0.15 * pet; kid.elbows[1].rotation.x = -0.25 * pet; }
@@ -3963,14 +4258,14 @@
     const want = Math.max(0.3, fr.dist * camHit(fr.x, fr.y, fr.x + ox * fr.dist, fr.y + oy * fr.dist));
     fr.camD = want < fr.camD ? want : fr.camD + (want - fr.camD) * Math.min(1, dt * 3);
     const cx = fr.x + ox * fr.camD, cy = fr.y + oy * fr.camD;
-    let ch = fr.h + 1.0 + sp * fr.camD + Math.max(0, fr.dist - fr.camD) * 0.45;
+    let ch = fr.h + (kid.camUp || 1.0) + sp * fr.camD + Math.max(0, fr.dist - fr.camD) * 0.45;
     if (state.roof && Math.abs(X(cx)) < hw + 0.05 && Math.abs(Z(cy)) < hd + 0.05) ch = Math.min(ch, FL + CEIL - 0.12);
     if (state.techo && losaFloor(cx, cy, toHouse(fw.set(X(cx), 0, Z(cy)))) === losaY) ch = Math.min(ch, losaY + TECHO.low - 0.12);   // bajo el techo de la losa
     if (state.losa && fr.h < -0.5) { const q = toHouse(fw.set(X(cx), 0, Z(cy))); if (vOf(q.x, q.z) < BOQ.depth + BOQ.wall + 0.3) ch = Math.min(ch, losaY - LOSA.thick - 0.12); }   // en el garaje
     ch = Math.max(ch, fr.h + 0.45);
     toHouse(camWant.set(X(cx), ch, Z(cy)));
     camWant.y = Math.max(camWant.y, (state.boq ? boqY : groundY)(camWant.x, camWant.z) + 0.3);
-    toHouse(lookWant.set(X(fr.x), fr.h + (fr.pose ? fr.pose.look : LOOK_H) + fr.jz * 0.5, Z(fr.y)));
+    toHouse(lookWant.set(X(fr.x), fr.h + (fr.pose ? fr.pose.look + (kid.poseUp || 0) : kid.lookH || LOOK_H) + fr.jz * 0.5, Z(fr.y)));
     kid.root.visible = fr.camD > 0.45;
     if (fr.fly) {                                             // al entrar, la cámara vuela desde la vista de antes
       const k = Math.min(1, (now - fr.fly.start) / 1100), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
@@ -4127,6 +4422,64 @@
       this.lead[bar].forEach(([at, m, len]) => { if (at === s) tone(t, m, len * d * 0.95, { type: 'sawtooth', vol: 0.045, s: 0.8, d: 0.2, r: 0.1, cut: 3800, dist: 1, rev: 0.15, harm: [[1, 1], [2.005, 0.3]] }); });
     },
   };
+  // Una nota que se desliza de m0 a m1 en at segundos (pito de émbolo, bocina, trombón). vib: vibrato en centésimas, a rate por segundo
+  function glide(t, m0, m1, dur, o) {
+    const { ctx } = MUSIC, osc = ctx.createOscillator(), lp = ctx.createBiquadFilter(), env = ctx.createGain();
+    osc.type = o.type || 'sine'; osc.frequency.setValueAtTime(midiHz(m0), t); osc.frequency.exponentialRampToValueAtTime(midiHz(m1), t + (o.at || dur));
+    if (o.vib) {
+      const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = o.rate || 5.5; lg.gain.value = o.vib;
+      l.connect(lg); lg.connect(osc.detune); l.start(t); l.stop(t + dur + 0.3);
+    }
+    lp.type = 'lowpass'; lp.frequency.value = o.cut || 3000;
+    env.gain.setValueAtTime(0.0001, t); env.gain.linearRampToValueAtTime(o.vol, t + (o.a || 0.03)); env.gain.setTargetAtTime(0, t + dur, 0.05);
+    osc.connect(lp); lp.connect(env); env.connect(MUSIC.master);
+    if (o.rev) { const send = ctx.createGain(); send.gain.value = o.rev; env.connect(send); send.connect(MUSIC.rev); }
+    osc.start(t); osc.stop(t + dur + 0.3);
+  }
+  /* Maritza (pedido de la dueña, 2026-09-21): música de circo torpe y lenta. Marcha a 80 pulsos por minuto en do mayor: la
+     tuba hace "um" en el 1 y el 3, un poco desafinada hacia abajo y a destiempo; el acordeón hace "pa" en el 2 y el 4 con un
+     platillo suave, y la melodía va en un órgano de feria (calíope: armónicos y una voz desafinada que hace temblar la nota),
+     llena de notas cromáticas que se tropiezan. En la segunda vuelta un fagot la dobla una octava abajo y un poquito tarde,
+     como si no la alcanzara. Hay bocinazos de payaso, un pito de émbolo que sube y baja y, al final, el trombón triste */
+  const CIRCUS_A = [
+    [[0, 64, 1], [1, 63, 1], [2, 64, 2], [4, 67, 1], [5, 66, 1], [6, 67, 2]],
+    [[0, 72, 2], [2, 71, 1], [3, 70, 1], [4, 69, 2], [6, 67, 2]],
+    [[0, 65, 1], [1, 64, 1], [2, 65, 2], [4, 71, 1], [5, 70, 1], [6, 71, 2]],
+    [[0, 74, 2], [2, 73, 1], [3, 74, 1], [4, 71, 2]],
+    [[0, 64, 1], [1, 63, 1], [2, 64, 2], [4, 67, 1], [5, 66, 1], [6, 67, 2]],
+    [[0, 69, 2], [2, 68, 1], [3, 69, 1], [4, 72, 2], [6, 77, 2]],
+    [[0, 76, 1], [1, 75, 1], [2, 74, 1], [3, 73, 1], [4, 72, 1], [5, 71, 1], [6, 67, 1], [7, 71, 1]],
+    [[0, 72, 2], [2, 67, 1], [3, 64, 1], [4, 60, 2]],
+  ];
+  SONGS.maritza = {
+    step: 60 / 80 / 2, per: 8,
+    chords: ['C', 'C', 'G7', 'G7', 'C', 'F', 'G7', 'C', 'C', 'C', 'G7', 'G7', 'C', 'F', 'G7', 'C'],
+    bass: { C: [36, 43], G7: [43, 38], F: [41, 36] },
+    pah: { C: [55, 60, 64], G7: [53, 59, 62], F: [57, 60, 65] },
+    mel: CIRCUS_A.concat(CIRCUS_A.slice(0, 7), [[]]),
+    play(bar, s, t, d) {
+      const name = this.chords[bar], second = bar >= 8, last = bar === 15;
+      if ((s === 0 || s === 4) && !(last && s)) {
+        tone(t + 0.015 + Math.random() * 0.025, this.bass[name][s ? 1 : 0], d * 1.5, { type: 'sawtooth', vol: 0.15, a: 0.025, s: 0.55, d: 0.18, r: 0.1, cut: 380, detune: -14, harm: [[1, 1], [2, 0.3]] });
+        kick(t, 0.4);
+      }
+      if ((s === 2 || s === 6) && !last) {
+        this.pah[name].forEach((m, i) => tone(t, m, d * 0.45, { type: 'square', vol: 0.022, s: 0, d: 0.1, r: 0.05, cut: 1600, detune: (i - 1) * 7 }));
+        hiss(t, 0.06, 0.14, 'highpass', 6500);
+      }
+      this.mel[bar].forEach(([at, m, len]) => {
+        if (at !== s) return;
+        tone(t, m, len * d * 0.85, { type: 'sine', vol: 0.075, a: 0.012, s: 0.75, d: 0.12, r: 0.06, rev: 0.18, harm: [[1, 1], [1.007, 0.7], [2, 0.45], [3, 0.25], [4, 0.12]] });
+        if (second) tone(t + 0.05, m - 12, len * d * 0.8, { type: 'square', vol: 0.03, a: 0.02, s: 0.7, d: 0.1, r: 0.05, cut: 850 });   // el fagot, tarde
+      });
+      if (bar === 3 && s >= 6) glide(t, 70, 66, 0.2, { type: 'square', vol: 0.05, cut: 1500 });                       // bocina de payaso
+      if (bar === 7 && s === 4) glide(t, 72, 96, d * 3, { vol: 0.05, rev: 0.2, vib: 25, rate: 7 });                  // pito de émbolo que sube
+      if (bar === 11 && s === 6) glide(t, 91, 67, d * 1.8, { vol: 0.05, rev: 0.2 });                                // y baja
+      if (last) [[0, 67, 1.6], [2, 66, 1.6], [4, 65, 1.6], [6, 64, 2.8]].forEach(([at, m, len], i) => {             // trombón triste
+        if (at === s) glide(t, m + 0.4, m, len * d, { type: 'sawtooth', vol: 0.07, cut: 1100, a: 0.05, at: 0.1, vib: i === 3 ? 45 : 8, rate: i === 3 ? 6 : 4, rev: 0.12 });
+      });
+    },
+  };
   // Programa las notas que caen en los próximos 120 ms; corre cada 40 ms
   function musicTick() {
     const { ctx, song } = MUSIC; if (!song || !ctx) return;
@@ -4192,7 +4545,7 @@
   }
   function footstep(v) {
     if (!sfxOk()) return;
-    STEP[surfaceAt(fr.x, fr.y)](MUSIC.ctx.currentTime + 0.005, v, (fr.who === 'alayna' ? 1.15 : fr.who === 'amanda' ? 1.0 : 0.85) * (0.95 + Math.random() * 0.1));
+    STEP[surfaceAt(fr.x, fr.y)](MUSIC.ctx.currentTime + 0.005, v, (kid.stepPitch || (fr.who === 'alayna' ? 1.15 : fr.who === 'amanda' ? 1.0 : 0.85)) * (0.95 + Math.random() * 0.1));
   }
   // El pestillo: un clic corto y brillante
   function latch(t, vol) {
@@ -4351,18 +4704,19 @@
     if (!fr.pose) return;
     [fr.x, fr.y] = fr.pose.from; fr.pose = null;
     kid.root.quaternion.identity(); kid.body.rotation.set(0, 0, 0);
-    kid.arms.forEach((a, i) => { a.rotation.z = (i ? 1 : -1) * 0.1; });
+    kid.arms.forEach((a, i) => { a.rotation.z = (i ? 1 : -1) * (kid.armOut || 0.1); });
   }
   function applyPose(t) {
     const P = fr.pose, s = kid.root.scale.x;
     kid.head.rotation.set(0, 0, 0);
     if (P.kind === 'swing' || P.kind === 'slide' || P.kind === 'hammock') { playPose(P, t); return; }
     if (P.kind === 'sit') {
-      kid.root.position.set(X(P.hx), FL + P.seat + 0.02 - 0.52 * s, Z(P.hy)); kid.root.rotation.set(0, P.face, 0);
+      const ad = kid.adult;                                   // Maritza no columpia los pies: los deja quietos, casi en el piso
+      kid.root.position.set(X(P.hx), FL + P.seat + (ad ? 0.04 : 0.02) - 0.52 * s, Z(P.hy)); kid.root.rotation.set(0, P.face, 0);
       kid.body.rotation.set(-0.12, 0, 0); kid.body.position.y = Math.sin(t * 2.4) * 0.003;
       [0, 1].forEach(i => {
-        kid.legs[i].rotation.x = -1.5; kid.knees[i].rotation.x = 1.35 + Math.sin(t * 3 + i * Math.PI) * 0.22;   // columpia los pies
-        kid.feet[i].rotation.x = 0.1; kid.arms[i].rotation.x = -0.5; kid.elbows[i].rotation.x = -0.95;
+        kid.legs[i].rotation.x = ad ? -1.4 : -1.5; kid.knees[i].rotation.x = ad ? 1.4 : 1.35 + Math.sin(t * 3 + i * Math.PI) * 0.22;   // columpia los pies
+        kid.feet[i].rotation.x = ad ? 0.35 : 0.1; kid.arms[i].rotation.x = -0.5; kid.elbows[i].rotation.x = -0.95;
       });
       kid.head.rotation.y = Math.sin(t * 0.6) * 0.35;
     } else {
@@ -4409,10 +4763,73 @@
     if (fr.pose) { endPose(); return; }
     if (ctxThing) ctxThing.act();
   }
-  function jump() { if (fr.on && !fr.pose && fr.jz === 0) { fr.jv = 3.0; express('feliz', 0.8); } }
+  function jump() { if (fr.on && !fr.pose && fr.jz === 0) { fr.jv = kid.jumpV || 3.0; express('feliz', 0.8); } }
+  // El botón de Hola (Q): saluda, o baila (Amanda), o se enoja (Maritza), según el act de cada uno
+  const ACT_DUR = { wave: 1.6, dance: 2.4, angry: 3.2 };
   function wave() {
     if (!fr.on || fr.pose) return;
-    fr.waveDur = fr.who === 'amanda' ? 2.4 : 1.6; fr.waveEnd = performance.now() / 1000 + fr.waveDur; express('feliz', fr.waveDur);
+    const act = kid.act || 'wave';
+    fr.waveDur = ACT_DUR[act]; fr.waveEnd = performance.now() / 1000 + fr.waveDur; fr.stomp = -1;
+    if (act === 'angry') { express('enojada', fr.waveDur); angrySound(); } else express('feliz', fr.waveDur);
+  }
+  /* Maritza enojada (pedido de la dueña, 2026-09-21): refunfuña (una sierra grave con vibrato por un filtro de voz), y
+     mientras le sale el humo pita como una olla de presión (dos silbidos agudos que suben) con el soplido del vapor. Cada
+     pisotón suena como un golpe sordo en el piso */
+  function angrySound() {
+    if (!sfxOk()) return;
+    const { ctx } = MUSIC, t = ctx.currentTime + 0.01;
+    const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(215, t + 0.55); o.frequency.linearRampToValueAtTime(165, t + 0.8);
+    lfo.frequency.value = 9; lg.gain.value = 7; lfo.connect(lg); lg.connect(o.frequency);
+    f.type = 'bandpass'; f.frequency.value = 620; f.Q.value = 2.2;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.3, t + 0.08); g.gain.setTargetAtTime(0, t + 0.7, 0.06);
+    o.connect(f); f.connect(g); g.connect(MUSIC.fx); o.start(t); lfo.start(t); o.stop(t + 1.1); lfo.stop(t + 1.1);
+    [2150, 2710].forEach((hz, i) => {
+      const w = ctx.createOscillator(), wg = ctx.createGain(), top = 0.045 - i * 0.015;
+      w.frequency.setValueAtTime(hz * 0.88, t + 0.4); w.frequency.linearRampToValueAtTime(hz, t + 1.4);
+      wg.gain.setValueAtTime(0.0001, t + 0.4); wg.gain.linearRampToValueAtTime(top, t + 1.2); wg.gain.setValueAtTime(top, t + 2.6); wg.gain.linearRampToValueAtTime(0.0001, t + 3.0);
+      w.connect(wg); wg.connect(MUSIC.fx); w.start(t + 0.4); w.stop(t + 3.05);
+    });
+    const n = ctx.createBufferSource(), nf = ctx.createBiquadFilter(), ng = ctx.createGain();
+    n.buffer = MUSIC.noise; n.loop = true; nf.type = 'highpass'; nf.frequency.value = 2500;
+    ng.gain.setValueAtTime(0.0001, t + 0.35); ng.gain.linearRampToValueAtTime(0.12, t + 0.7); ng.gain.setValueAtTime(0.12, t + 2.6); ng.gain.linearRampToValueAtTime(0.0001, t + 3.1);
+    n.connect(nf); nf.connect(ng); ng.connect(MUSIC.fx); n.start(t + 0.35); n.stop(t + 3.15);
+  }
+  function stompSound() { if (sfxOk()) { const t = MUSIC.ctx.currentTime + 0.005; thump(t, 0.7, 120, 40, 0.16); burst(t, 0.35, 0.08, 'lowpass', 600); } }
+  // El humo de las orejas de Maritza: mientras on, salen bolitas de las dos orejas (una y una), primero de lado y después
+  // suben, crecen y se desvanecen en un segundo. Las posiciones van en house, así suben derecho aunque ella camine
+  const earP = new V3(), earQ = new V3();
+  function steamStep(dt, on) {
+    const S = kid.steam; if (!S) return;
+    if (on) {
+      S.acc += dt * 30;
+      while (S.acc >= 1) {
+        S.acc -= 1;
+        const p = S.parts.find(q => q.life <= 0); if (!p) break;
+        const ear = S.ears[S.side = 1 - S.side];
+        ear.getWorldPosition(earP); house.worldToLocal(earP);
+        earQ.set(ear.position.x * 2.2, ear.position.y, ear.position.z); ear.parent.localToWorld(earQ); house.worldToLocal(earQ); earQ.sub(earP).normalize();
+        p.life = p.max = 0.9 + Math.random() * 0.4;
+        p.vx = earQ.x * 0.7 + (Math.random() - 0.5) * 0.15; p.vy = 0.25 + Math.random() * 0.2; p.vz = earQ.z * 0.7 + (Math.random() - 0.5) * 0.15;
+        p.mesh.position.copy(earP); p.mesh.visible = true;
+      }
+    } else S.acc = 0;
+    S.parts.forEach(p => {
+      if (p.life <= 0) return;
+      p.life -= dt;
+      if (p.life <= 0) { p.mesh.visible = false; return; }
+      const k = 1 - p.life / p.max, drag = Math.exp(-2.2 * dt);
+      p.vx *= drag; p.vz *= drag; p.vy += 0.5 * dt;
+      p.mesh.position.x += p.vx * dt; p.mesh.position.y += p.vy * dt; p.mesh.position.z += p.vz * dt;
+      p.mesh.scale.setScalar(0.025 + 0.11 * Math.sqrt(k));
+      p.mesh.material.opacity = 0.85 * Math.min(1, k * 8) * (1 - k);
+    });
+  }
+  // Se le pasa el enojo de una vez: sin humo y con su color (al cambiar de personaje o salir del juego)
+  function calmDown(k) {
+    if (!k) return;
+    if (k.flush) k.flush(0);
+    if (k.steam) k.steam.parts.forEach(p => { p.life = 0; p.mesh.visible = false; });
   }
   function fetchBall() {
     if (!fr.on) return;
@@ -4465,7 +4882,7 @@
   // Cara que pone el niño por un rato: 'feliz' (patea, salta, saluda, se cambia de ropa) o 'sorpresa' (se topa con algo)
   function express(mood, dur) { fr.mood = mood; fr.moodEnd = performance.now() / 1000 + dur; }
   // Cambiarse de ropa en el ropero: la muda siguiente, con una vueltita, un tintineo y cara feliz
-  const OUTFIT_NAME = { casual: 'la camiseta', policia: 'el traje de policía', vestido: 'el vestido', gabby: 'el traje de Gabby', casa: 'la camiseta y el short', playa: 'la camiseta de Nirvana' };
+  const OUTFIT_NAME = { casual: 'la camiseta', policia: 'el traje de policía', vestido: 'el vestido', gabby: 'el traje de Gabby', casa: 'la camiseta y el short', playa: 'la camiseta de Nirvana', verde: 'la blusa verde', azul: 'la blusa azul' };
   const nextOutfit = () => { const n = Object.keys(kid.outfits); return n[(n.indexOf(kid.outfitName) + 1) % n.length]; };
   function chime() {
     if (!sfxOk()) return;
@@ -5184,14 +5601,20 @@
   function playFov() { camera.fov = camera.aspect < 1 ? 70 : 60; camera.updateProjectionMatrix(); }
   // Cambia el niño que se juega; el otro se esconde. Sigue en el mismo lugar, mirando para el mismo lado
   function setKid(who) {
-    endPose(); if (kid) kid.root.visible = false;
+    endPose(); if (kid) { kid.root.visible = false; calmDown(kid); }
     fr.who = who; kid = kidOf(who); kid.root.visible = fr.on;
+    FR_R = kid.r || 0.14; fr.waveEnd = fr.moodEnd = 0;
     const other = KID_NAME[KID_ORDER[(KID_ORDER.indexOf(who) + 1) % KID_ORDER.length]];
     $('#fh-name').textContent = kid.name;
-    const wb = $('#act-wave'), dance = who === 'amanda';
+    // El botón de Hola cambia según lo que haga cada uno: saludar, bailar (Amanda) o enojarse (Maritza: una cara brava con humo)
+    const wb = $('#act-wave'), act = kid.act || 'wave';
     if (!wb.dataset.wave) wb.dataset.wave = wb.innerHTML;
-    wb.innerHTML = dance ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path d="M9 9l11-2"/></svg>' : wb.dataset.wave;
-    wb.title = dance ? 'Bailar (Q)' : 'Saludar (Q)'; wb.setAttribute('aria-label', dance ? 'Bailar' : 'Saludar');
+    const svg = d => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>';
+    wb.innerHTML = act === 'dance' ? svg('<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path d="M9 9l11-2"/>')
+      : act === 'angry' ? svg('<circle cx="12" cy="14" r="7"/><path d="M8.5 11.5l2.6 1.1M15.5 11.5l-2.6 1.1M9.3 18.2c1.6-1.4 3.8-1.4 5.4 0M3.2 8.5c-1.3-1.2.5-2.6-.6-4M20.8 8.5c1.3-1.2-.5-2.6.6-4"/>')
+      : wb.dataset.wave;
+    const label = act === 'dance' ? 'Bailar' : act === 'angry' ? 'Enojarse' : 'Saludar';
+    wb.title = label + ' (Q)'; wb.setAttribute('aria-label', label);
     swapBtn.title = `Cambiar a ${other}`; swapBtn.setAttribute('aria-label', `Jugando con ${kid.name}. Cambiar a ${other}`);
     if (fr.on) playMusic(who);                                // cada niño con su canción
   }
@@ -5219,7 +5642,7 @@
       playFov();
       canvas.focus({ preventScroll: true });
     } else {
-      resetThings(); resetWorld(); resetStars(); dog.visible = playG.visible = false; kid.root.visible = false; playMusic(null);
+      resetThings(); resetWorld(); resetStars(); dog.visible = playG.visible = false; kid.root.visible = false; calmDown(kid); playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
       camera.fov = 42; camera.updateProjectionMatrix();
