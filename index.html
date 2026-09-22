@@ -1420,9 +1420,12 @@
   //   techo rojo. Torcida 6.5° con la colindancia, como en la vista satelital. Atrás, un rancho de zinc hasta el corte.
   // El costado oeste y la parte de atrás no se ven en las fotos: sus ventanas y la puerta trasera son ilustrativas
   const nbGlass = std({ color: 0xE4E6E3, roughness: .7, emissive: 0xffc37d, emissiveIntensity: 0 });   // cortinas claras, como en las fotos
-  /* Keylin chismeando (pedido de la dueña, 2026-09-21, con el permiso de Keylin): en el frente de la casa vecina de la izquierda,
-     que no tenía ventanas, van dos (ilustrativas). En la de la izquierda vista desde la calle —la más lejos de este lote— Keylin
-     se asoma detrás de la cortina: sale, se queda viendo un rato con la cabeza de lado y se vuelve a esconder. Su foto va aquí
+  /* Keylin chismeando (pedido de la dueña, 2026-09-21, con el permiso de Keylin): la casa vecina de la izquierda no tenía
+     ventanas; van dos en el frente (ilustrativas) y una alta en el costado que da a este lote, a la par del frente de nuestra
+     casa. Como esa casa está 1.90 m más abajo, su pared solo sube 1.10 m sobre nuestro terreno, así que la del costado queda
+     entre 0.25 y 0.80 m sobre el patio: desde el patio o el pasillo de la izquierda (también en el juego) se ve. Ahí Keylin se
+     asoma detrás de la cortina: sale, se queda viendo hacia nuestra casa con la cabeza de lado y se vuelve a esconder.
+     Primero estuvo en la ventana del frente de la izquierda, pero esa da a la calle y no se veía desde ninguna vista. Su foto va aquí
      mismo (recortada a la cara y los hombros, 240 × 286), con los bordes difuminados en óvalo; así la página sigue abriendo sin
      internet. La casa vecina es un bloque macizo, así que todo va pegado por fuera de la pared: el cuarto oscuro, ella, la
      cortina, el vidrio y el marco. Va en neighbors (capa Vecinos) */
@@ -1434,32 +1437,35 @@
     const frameM = std({ color: 0x3A3D40, roughness: .45, metalness: .5 }), roomM = std({ color: 0x2B2A2E, roughness: 1 });
     const curtainM = std({ color: 0xE6D8C2, roughness: .95, side: THREE.DoubleSide });
     const glassM = std({ color: 0xDCE6EA, roughness: .1, transparent: true, opacity: .18, depthWrite: false });
-    const WW = 1.0, WH = 1.1, SILL = 0.95;
-    let keylin = null, kx = 1;
-    [1.9, -1.9].forEach((d, k) => {                                      // d > 0: hacia afuera de este lote (la izquierda vista desde la calle)
-      const w = new THREE.Group(); neighbors.add(w);
-      w.position.set(a[0] + u[0] * NB.from + n[0] * (off + d), y0 + SILL + WH / 2, a[1] + u[1] * NB.from + n[1] * (off + d));
-      w.rotation.y = Math.atan2(-u[0], -u[1]);                             // z local hacia la calle, afuera de la pared
-      kx = Math.sign(-u[1] * n[0] + u[0] * n[1]) || 1;                   // +1 si la x local va hacia afuera de este lote
-      addBox(WW, WH, 0.004, roomM, 0, 0, 0.004, w);                        // el cuarto, oscuro
-      [[0, WH / 2 + 0.025, WW + 0.1, 0.05], [0, -WH / 2 - 0.025, WW + 0.1, 0.05]].forEach(([x, y, bw, bh]) => addBox(bw, bh, 0.07, frameM, x, y, 0.035, w));
+    // Una ventana pegada a la pared: el cuarto oscuro, el marco, el parral, la repisa, el vidrio y la cortina con pliegues, que
+    // tapa la fracción cf del lado kx. z local hacia afuera de la pared
+    const addWin = (x, y, z, rotY, WW, WH, cf, kx) => {
+      const w = new THREE.Group(); w.position.set(x, y, z); w.rotation.y = rotY; neighbors.add(w);
+      addBox(WW, WH, 0.004, roomM, 0, 0, 0.004, w);
+      [WH / 2 + 0.025, -WH / 2 - 0.025].forEach(yy => addBox(WW + 0.1, 0.05, 0.07, frameM, 0, yy, 0.035, w));
       [-1, 1].forEach(sx => addBox(0.05, WH, 0.07, frameM, sx * (WW / 2 + 0.025), 0, 0.035, w));
-      addBox(0.035, WH, 0.05, frameM, 0, 0, 0.05, w);                      // el parral del medio
-      addBox(WW + 0.16, 0.04, 0.12, frameM, 0, -WH / 2 - 0.07, 0.06, w);   // la repisa
+      addBox(0.035, WH, 0.05, frameM, 0, 0, 0.05, w);
+      addBox(WW + 0.16, 0.04, 0.12, frameM, 0, -WH / 2 - 0.07, 0.06, w);
       const gl = addBox(WW, WH, 0.004, glassM, 0, 0, 0.055, w); gl.castShadow = false; gl.userData.noPick = true;
-      // Cortina con pliegues: tapa la mitad de afuera de la ventana (la de Keylin) o casi toda (la otra)
-      const cw = k === 0 ? WW * 0.55 : WW * 0.9, cg = new THREE.PlaneGeometry(cw, WH - 0.04, 24, 1), cp = cg.attributes.position;
+      const cw = WW * cf, cg = new THREE.PlaneGeometry(cw, WH - 0.04, 24, 1), cp = cg.attributes.position;
       for (let v = 0; v < cp.count; v++) cp.setZ(v, 0.012 * Math.sin(cp.getX(v) / cw * Math.PI * 9));
       cg.computeVertexNormals();
       const cur = new THREE.Mesh(cg, curtainM); cur.position.set(kx * (WW / 2 - cw / 2), 0, 0.034); cur.castShadow = false; w.add(cur);
-      if (k === 0) keylin = w;
-    });
+      return w;
+    };
+    // Frente, a 1.9 m a cada lado del centro, con las cortinas casi cerradas
+    [1.9, -1.9].forEach(d => addWin(a[0] + u[0] * NB.from + n[0] * (off + d), y0 + 0.95 + 0.55, a[1] + u[1] * NB.from + n[1] * (off + d), Math.atan2(-u[0], -u[1]), 1.0, 1.1, 0.85, 1));
+    // Costado que da a este lote, a 9.2 m de la calle (a la par de la esquina de adelante de nuestra casa): la de Keylin. La
+    // cortina tapa el lado de la calle y ella se asoma hacia el fondo
+    const T = 9.2, rotY = Math.atan2(-n[0], -n[1]);
+    const kx = Math.sign(Math.cos(rotY) * -u[0] - Math.sin(rotY) * -u[1]) || 1;          // +1 si la x local va hacia la calle
+    const keylin = addWin(a[0] + u[0] * T + n[0] * 0.03, y0 + 2.15 + 0.275, a[1] + u[1] * T + n[1] * 0.03, rotY, 0.9, 0.55, 0.5, kx);
     // Keylin: la foto en un lienzo, con un óvalo que se difumina en el borde
     const cv = document.createElement('canvas'); cv.width = 240; cv.height = 286;
     const ktex = new THREE.CanvasTexture(cv);
     const km = std({ map: ktex, transparent: true, depthWrite: false, roughness: 1, emissive: 0xffffff, emissiveMap: ktex, emissiveIntensity: .5 });
-    const kp = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.5), km); kp.castShadow = false; kp.userData.noPick = true;
-    kp.position.set(kx * 0.3, 0.02, 0.018); keylin.add(kp);
+    const kp = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.48), km); kp.castShadow = false; kp.userData.noPick = true;
+    kp.position.set(kx * 0.26, 0, 0.018); keylin.add(kp);
     const img = new Image();
     img.onload = () => {
       const g = cv.getContext('2d'); g.drawImage(img, 0, 0, 240, 286);
@@ -1475,9 +1481,9 @@
       if (!neighbors.visible) return;
       const c = reduceMotion ? 1 : ((t / 1000) % 9) / 9 * 9;
       const out = reduceMotion ? 1 : c < 0.6 ? smooth(0, 0.6, c) : c < 4.1 ? 1 : c < 4.6 ? 1 - smooth(4.1, 4.6, c) : 0;
-      kp.position.x = kx * (0.3 - 0.44 * out);
+      kp.position.x = kx * (0.26 - 0.34 * out);
       kp.rotation.z = kx * (0.1 + 0.04 * Math.sin(t / 600)) * out;
-      kp.position.y = 0.02 + 0.01 * Math.sin(t / 450) * out;
+      kp.position.y = 0.01 * Math.sin(t / 450) * out;
     };
   }
   {
