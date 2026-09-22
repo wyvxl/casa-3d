@@ -5417,9 +5417,11 @@
   function setHour(h) { $('#hour').value = h; applyHour(h); }
   // Foto: dibuja un cuadro, lo guarda como PNG (sin los botones del juego), con un destello y el ruido de la cámara
   function takePhoto() {
-    renderer.render(scene, camera);
+    const pr = renderer.getPixelRatio();                      // la foto sale con la resolución completa aunque el juego la haya bajado
+    setRes(PR.max); renderer.shadowMap.needsUpdate = true; renderer.render(scene, camera);
     const a = document.createElement('a'), d = new Date(), p2 = n => String(n).padStart(2, '0');
     a.href = canvas.toDataURL('image/png');
+    setRes(pr);
     a.download = kid.name.toLowerCase() + '-en-la-casa-' + d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '-' + p2(d.getHours()) + p2(d.getMinutes()) + '.png';
     document.body.appendChild(a); a.click(); a.remove();
     const fl = $('#fh-flash'); fl.classList.add('is-on'); requestAnimationFrame(() => requestAnimationFrame(() => fl.classList.remove('is-on')));
@@ -5699,9 +5701,10 @@
       doorLimits();
       DOORS.forEach(d => { d.th = d.w = d.hold = d.pull = 0; d.leaf.rotation.y = d.rot0; });
       fr.fly = reduceMotion ? null : { p0: camera.position.clone(), t0: controls.target.clone(), start: performance.now() };
-      playFov();
+      playFov(); gameRes(true);
       canvas.focus({ preventScroll: true });
     } else {
+      gameRes(false);
       resetThings(); resetWorld(); resetStars(); dog.visible = playG.visible = false; kid.root.visible = false; calmDown(kid); playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
@@ -5762,6 +5765,37 @@
   }
   window.addEventListener('resize', resize);
   resize();
+
+  /* El juego más liviano en el teléfono (2026-09-22). En el juego, las sombras eran casi la mitad del trabajo de cada cuadro
+     (unas 258 de 542 llamadas de dibujo), porque se volvían a sacar en cada cuadro. Ahora:
+     - Sombras a 30 por segundo (GAME_SHADOW_MS) y ninguna de noche, que no hay sol. El niño camina 1.5 m/s, así que su sombra
+       se atrasa a lo sumo 5 cm, y no se nota. Achicar el área de la sombra alrededor del niño no ahorraba nada (las piezas
+       fijas están juntas en mallas grandes, ver bake), por eso no se hizo.
+     - Resolución que baja sola (PR): si el juego va a menos de unos 45 cuadros por segundo, baja un escalón
+       (de 2 a 1.5, 1.25 y 1 pixel por punto) y lo recuerda para la próxima vez que se juegue. Un ritmo parejo de 30 (el ahorro
+       de batería del iPhone lo fija ahí) no cuenta como lento. Fuera del juego y en las fotos, siempre la resolución completa */
+  const GAME_SHADOW_MS = 30;
+  let shadowNext = 0;
+  function gameShadows(now) {
+    if (sun.intensity < 0.01 || now < shadowNext) return;
+    renderer.shadowMap.needsUpdate = true; shadowNext = now + GAME_SHADOW_MS;
+  }
+  const PR = { max: renderer.getPixelRatio(), game: 0, n: 0, sum: 0, sq: 0, from: 0 };
+  PR.steps = [PR.max, ...[1.5, 1.25, 1].filter(r => r < PR.max)];
+  const setRes = r => { if (renderer.getPixelRatio() !== r) renderer.setPixelRatio(r); };
+  function gameRes(on) {                                     // al entrar al juego, la que quedó la vez pasada; al salir, la completa
+    setRes(on ? PR.steps[PR.game] : PR.max);
+    PR.n = PR.sum = PR.sq = 0; PR.from = performance.now() + 2000;   // los primeros cuadros traen tirones de arranque
+  }
+  function tuneRes(dt, now) {
+    if (now < PR.from || PR.game >= PR.steps.length - 1) return;
+    PR.n++; PR.sum += dt; PR.sq += dt * dt;
+    if (PR.n < 90 && PR.sum < 1.5) return;                    // 90 cuadros o 1.5 s, lo que llegue primero
+    const avg = PR.sum / PR.n, sd = Math.sqrt(Math.max(0, PR.sq / PR.n - avg * avg));
+    PR.n = PR.sum = PR.sq = 0;
+    const capped30 = sd < 0.003 && Math.abs(avg - 1 / 30) < 0.003;   // parejo en 30: es el ahorro de batería, no el juego
+    if (avg > 0.022 && !capped30) { PR.game++; setRes(PR.steps[PR.game]); PR.from = now + 1500; }
+  }
 
   /* Teléfono: los controles se pasan a una hoja que sube desde abajo (pedido de la dueña, 2026-09-21). Son los mismos bloques
      del panel de la computadora, movidos a la hoja y convertidos en pestañas —Espacios, Capas (con la hora del día), Colores y
@@ -5837,9 +5871,9 @@
   let lastNow = performance.now(), firstFrame = true;
   function loop(now) {
     requestAnimationFrame(loop);
-    const dt = Math.min(0.05, Math.max(0, (now - lastNow) / 1000)); lastNow = now;
+    const raw = Math.max(0, (now - lastNow) / 1000), dt = Math.min(0.05, raw); lastNow = now;
     let busy = fr.on || now < wakeUntil;
-    if (fr.on) { playStep(dt, now); renderer.shadowMap.needsUpdate = true; }   // en el juego la cámara sigue al niño, no OrbitControls
+    if (fr.on) { playStep(dt, now); gameShadows(now); tuneRes(Math.min(0.2, raw), now); }   // en el juego la cámara sigue al niño, no OrbitControls
     else {
       if (tween) {
         let k = Math.min(1, (now - tween.start) / tween.dur);
