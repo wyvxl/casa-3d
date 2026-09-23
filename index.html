@@ -5730,7 +5730,7 @@
       playFov(); gameRes(true);
       canvas.focus({ preventScroll: true });
     } else {
-      gameRes(false);
+      gameRes(false); orbitLow = false;
       resetThings(); resetWorld(); resetStars(); dog.visible = playG.visible = false; kid.root.visible = false; calmDown(kid); playMusic(null);
       DOORS.forEach(d => { d.leaf.rotation.y = d.home; });
       controls.target.copy(fr.look);
@@ -5822,6 +5822,21 @@
     const capped30 = sd < 0.003 && Math.abs(avg - 1 / 30) < 0.003;   // parejo en 30: es el ahorro de batería, no el juego
     if (avg > 0.022 && !capped30) { PR.game++; setRes(PR.steps[PR.game]); PR.from = now + 1500; }
   }
+  /* Las vistas más fluidas en el teléfono (2026-09-22): mientras la cámara se mueve (girar, acercar, desplazar o un vuelo a
+     una vista) dibuja con menos resolución (PR.move, 1.25 pixeles por punto en vez de 2, más o menos un tercio de los
+     pixeles), y en cuanto queda quieta (ORBIT_STILL_MS) vuelve a la completa y redibuja. Quieta se ve igual que siempre; en
+     movimiento no se nota. En la computadora, con 1 pixel por punto, no cambia nada */
+  PR.move = Math.min(PR.max, 1.25);
+  const ORBIT_STILL_MS = 150, camPrev = new V3(), tgtPrev = new V3();
+  let orbitLow = false, stillSince = 0;
+  function orbitRes(now) {                                    // devuelve true si hay que redibujar para volver a la resolución completa
+    // más de 1 mm: el frenado de OrbitControls la sigue corriendo en fracciones de milímetro sin terminar nunca
+    const moved = camPrev.distanceToSquared(camera.position) > 1e-6 || tgtPrev.distanceToSquared(controls.target) > 1e-6;
+    camPrev.copy(camera.position); tgtPrev.copy(controls.target);
+    if (moved) { stillSince = now; if (!orbitLow && PR.move < PR.max) { orbitLow = true; setRes(PR.move); } return false; }
+    if (orbitLow && now - stillSince > ORBIT_STILL_MS) { orbitLow = false; setRes(PR.max); return true; }
+    return false;
+  }
 
   /* Teléfono: los controles se pasan a una hoja que sube desde abajo (pedido de la dueña, 2026-09-21). Son los mismos bloques
      del panel de la computadora, movidos a la hoja y convertidos en pestañas —Espacios, Capas (con la hora del día), Colores y
@@ -5912,8 +5927,13 @@
       if (controls.update()) busy = true;                     // true mientras la cámara se sigue deslizando
       const floor = (state.boq ? boqY : groundY)(camera.position.x, camera.position.z) + 0.6;   // que la cámara no se meta en el cerro ni en el talud
       if (camera.position.y < floor) camera.position.y = floor;
+      if (orbitRes(now)) busy = true;                         // menos resolución mientras la cámara se mueve
     }
     if (!busy && !firstFrame) return;                         // nada cambió: queda el último cuadro
+    /* Primer cuadro: deja listos de una vez todos los materiales y las texturas, también los de las capas apagadas, las
+       estrellas y la noche (warmUp, en la sección niños). Si no, se preparan la primera vez que se ven y la página se congela
+       un momento: pasar a la noche por primera vez tardaba cerca de un segundo (2026-09-22). Mientras, sigue el aviso Armando la casa */
+    if (firstFrame) warmUp();
     keylinStep(now);
     if (measureG.visible) measureScale();                     // la medida, del mismo grueso en pantalla de cerca y de lejos
     renderer.render(scene, camera);
