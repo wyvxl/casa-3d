@@ -2105,6 +2105,7 @@
   }
   let lastHour = 10, rainK = 0;                               // rainK: cuánto llueve (juego), de 0 a 1
   const ENV_MATS = [];                                        // [material, reflejo de día]: el reflejo del cielo baja de noche (ver PHOTO)
+  let envDay = 1;                                             // el factor de ahora (applyHour), para los materiales que llegan después
   const rainTop = new THREE.Color(0x7D8891), rainBot = new THREE.Color(0xA3ACB2);
   function applyHour(h) {
     const t = (h - 6) / 12 * Math.PI, s = Math.sin(t);
@@ -2127,7 +2128,8 @@
     M.frosted.emissiveIntensity = night * 0.8;
     nbGlass.emissiveIntensity = night * 0.55;
     M.bulb.emissiveIntensity = night * 1.6;
-    ENV_MATS.forEach(([m, k]) => { m.envMapIntensity = k * (0.08 + 0.92 * day) * (1 - 0.5 * rainK); });
+    envDay = (0.08 + 0.92 * day) * (1 - 0.5 * rainK);
+    ENV_MATS.forEach(([m, k]) => { m.envMapIntensity = k * envDay; });
     // Cada luz sigue la hora, salvo que en el juego la hayan prendido o apagado en su apagador (userData.on)
     roomLights.forEach(L => {
       const k = L.userData.on == null ? night : L.userData.on ? 1 : 0;
@@ -2371,12 +2373,80 @@
     const pm = new THREE.PMREMGenerator(renderer), rt = pm.fromScene(es, 0.02);
     pm.dispose(); return rt.texture;
   })();
+  /* Personajes más reales (2026-11-19): la tela, la piel y el pelo eran todos la misma superficie lisa. dressUp le da a cada
+     material de un niño (o de Marshall) el relieve que le toca, dibujado aquí y compartido por todos: la ropa, arrugas suaves con
+     la trama de la tela; la piel, poros muy finos; el pelaje, pelitos cortos. El pelo brilla un poco y los ojos, los metales y lo
+     barnizado reflejan el cielo (ENV_MATS, que sigue la hora). Corre antes de packKid y de warmUp: no recompila en el juego */
+  const bumpTex = (S, rep, draw, k) => {
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d'), r = rng(77); g.fillStyle = '#808080'; g.fillRect(0, 0, S, S); draw(g, S, r);
+    const d = g.getImageData(0, 0, S, S).data, out = g.createImageData(S, S), h = (x, y) => d[(((y + S) % S) * S + (x + S) % S) * 4] / 255;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const gx = (h(x + 1, y) - h(x - 1, y)) * k, gy = (h(x, y + 1) - h(x, y - 1)) * k, l = Math.hypot(gx, gy, 1), i = (y * S + x) * 4;
+      out.data[i] = (-gx / l * .5 + .5) * 255; out.data[i + 1] = (gy / l * .5 + .5) * 255; out.data[i + 2] = (1 / l * .5 + .5) * 255; out.data[i + 3] = 255;
+    }
+    g.putImageData(out, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); t.anisotropy = maxAniso; return t;
+  };
+  // Las manchas y trazos se dibujan nueve veces corridos un lienzo, así la textura se repite sin costura
+  const wrap9 = (S, f) => { for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) f(dx, dy); };
+  let FABRIC_N = null, SKIN_N = null, FUR_N = null;
+  function charTextures() {
+    if (FABRIC_N) return;
+    FABRIC_N = bumpTex(256, 2, (g, S, r) => {
+      const folds = Array.from({ length: 14 }, () => [r() * S, r() * S, 20 + r() * 50, 4 + r() * 8, r() * 3.1, r() < .5]);
+      folds.forEach(([x, y, l, w, a, up]) => wrap9(S, (dx, dy) => {           // arrugas: trazos largos y borrosos
+        const gr = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, l);
+        gr.addColorStop(0, up ? 'rgba(255,255,255,.22)' : 'rgba(0,0,0,.22)'); gr.addColorStop(1, 'rgba(128,128,128,0)');
+        g.save(); g.translate(x + dx, y + dy); g.rotate(a); g.scale(1, w / l); g.translate(-x - dx, -y - dy);
+        g.fillStyle = gr; g.fillRect(x + dx - l, y + dy - l, 2 * l, 2 * l); g.restore();
+      }));
+      // grano de la tela al azar (una trama en rayas hacía moiré de lejos)
+      for (let i = 0; i < 5000; i++) { g.fillStyle = r() < .5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.06)'; g.fillRect(r() * S, r() * S, 1 + r() * 2, 1); }
+    }, 3);
+    SKIN_N = bumpTex(128, 6, (g, S, r) => {
+      for (let i = 0; i < 900; i++) { g.fillStyle = r() < .5 ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.12)'; g.fillRect(r() * S, r() * S, 1 + r(), 1 + r()); }
+    }, 1.2);
+    FUR_N = bumpTex(128, 5, (g, S, r) => {
+      g.lineWidth = 1; g.lineCap = 'round';
+      for (let i = 0; i < 1600; i++) {
+        const x = r() * S, y = r() * S, l = 3 + r() * 4, a = 1.4 + (r() - .5) * .7;
+        g.strokeStyle = r() < .5 ? 'rgba(255,255,255,.35)' : 'rgba(0,0,0,.35)';
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+      }
+    }, 2.5);
+  }
+  function dressUp(root, skin = [], fur = []) {
+    charTextures();
+    const seen = new Set(), env = (m, k) => { if (!m.envMap) { m.envMap = envMap; m.envMapIntensity = k * envDay; ENV_MATS.push([m, k]); } };
+    root.traverse(o => (Array.isArray(o.material) ? o.material : o.material ? [o.material] : []).forEach(m => {
+      if (!m || seen.has(m) || !m.isMeshStandardMaterial || m.envMap) return;
+      seen.add(m);
+      const lit = m.emissiveIntensity > 0 && m.emissive && m.emissive.getHex() !== 0;
+      if (lit) return;                                                        // brillitos de los ojos y la cara pintada de luz
+      if (fur.includes(m)) { m.normalMap = FUR_N; m.normalScale.set(.6, .6); env(m, .1); }
+      else if (skin.includes(m)) { if (!m.normalMap) { m.normalMap = SKIN_N; m.normalScale.set(.18, .18); } env(m, .12); }
+      else if (m.metalness >= .3) env(m, .9);
+      else if (m.roughness <= .35) env(m, 1);                               // ojos, nariz, charol: se ven mojados o barnizados
+      else if (m.vertexColors) { m.roughness = Math.min(m.roughness, .6); env(m, .35); }   // pelo
+      else if (!m.normalMap) { m.normalMap = FABRIC_N; m.normalScale.set(.45, .45); env(m, .08); }
+      m.needsUpdate = true;
+    }));
+  }
   const isRoofMat = m => m.map === T_roof;
   const ENV_K = new Map([[M.glass, 1], [M.clearGlass, 1], [M.frosted, .5], [M.alu, .8], [M.mirror, 1.2], [M.cap, .7], [M.brass, .9], [M.trim, .25]]);
   // Revoque y concreto en cajas: la textura iba una vez por cara, estirada; ahora se repite cada WORLD_UV metros en las caras
   // que llevan ese material (las demás caras de la caja, como la puerta, quedan igual)
   const WORLD_UV = new Map([[T_plaster, 2], [T_concrete, 2], [T_wood, 1]]);
   const BOX_FACE = [[2, 1], [2, 1], [0, 2], [0, 2], [0, 1], [0, 1]];   // ejes (ancho 0, alto 1, fondo 2) de u y v en cada cara
+  // Muebles: veta de madera en los dos tonos de madera (cada 1 m, como los marcos) y relieve de tela en sillones, cojines,
+  // ropa de cama y alfombra. Las plantas de adentro llevan las mismas hojitas que los árboles
+  charTextures();
+  [COL.woodD, COL.woodL].forEach(c => { const m = matCache[c]; if (m) { m.map = T_wood; m.roughness = .6; } });
+  [COL.linen, COL.sage, COL.clay, COL.pillow, COL.sofa, COL.sofaL, COL.but, COL.butL, COL.rug].forEach(c => {
+    const m = matCache[c]; if (m) { m.normalMap = FABRIC_N; m.normalScale.set(.5, .5); m.roughness = .9; }
+  });
+  Object.assign(M.leaf, { map: LEAF.map, normalMap: LEAF.n }); M.leaf.normalScale.set(.9, .9);
   {
     const sc = new V3(), wp = new V3(), done = new Set();
     BAKE_ROOTS.forEach(r => r.updateMatrixWorld(true));
@@ -3951,7 +4021,7 @@
   const KID_MAKE = { franco: makeFranco, alayna: makeAlayna, amanda: makeAmanda, maritza: makeMaritza };
   const KID_NAME = { franco: 'Franco', alayna: 'Alayna', amanda: 'Amanda', maritza: 'Maritza' };
   const KIDS = {};
-  const kidOf = who => KIDS[who] || (KIDS[who] = packKid(KID_MAKE[who]()));
+  const kidOf = who => KIDS[who] || (KIDS[who] = packKid((k => (dressUp(k.root, [k.skinM, k.faceMat]), k))(KID_MAKE[who]())));
   const KID_ORDER = ['franco', 'alayna', 'amanda', 'maritza'];
   let kid = null;                                             // el que se está jugando (ninguno hasta entrar al juego)
 
@@ -5134,6 +5204,7 @@
     kidPart(lock([[0, 0, 0], [0, 0.05, -0.03], [0, 0.1, -0.02], [0, 0.12, 0.02], [0, 0.105, 0.05]], 0.012, 0x1E1B1A, 0xF3F0EA, 0.4, 16, 6),
       std({ vertexColors: true, roughness: .8 }), 0, 0, 0, tail);
     Object.assign(DOG, { head, legs, tail, tongueM: tongue });
+    dressUp(dog, [], [blackF, white]);
   }
   ICONS.paw = '<circle cx="7" cy="9.5" r="1.8"/><circle cx="10.5" cy="6" r="1.8"/><circle cx="15" cy="6.3" r="1.8"/><circle cx="18.3" cy="10" r="1.7"/><path d="M8 17.5c0-3 2-5 4.5-5s4.5 2 4.5 5c0 2-1.6 2.5-2.8 2.2-1.1-.3-2.3-.3-3.4 0C9.6 20 8 19.5 8 17.5z"/>';
   // Ladrido de chihuahua: tres "yip" agudos, una sierra que baja por un filtro, con un soplo de ruido
