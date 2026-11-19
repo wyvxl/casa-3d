@@ -729,8 +729,49 @@
     leaf: std({ color: 0x4F7F3E, roughness: .9, flatShading: true }),
   };
   // Follaje de los árboles, los arbustos y las jardineras del lote
-  const leafMats = [0x4c7a3b, 0x5f8c46, 0x3f6a34, 0x6e9a52].map(c => std({ color: c, roughness: .9, flatShading: true }));
-  const bark = std({ color: 0x5b4332, roughness: 1 });
+  /* Follaje más real (2026-11-19): antes cada copa era una bola facetada de un solo color. Ahora lleva una textura de hojitas
+     (dibujada aquí, en gris: el verde lo pone cada material) con su relieve, y la bola se deforma un poco (leafGeo) */
+  const LEAF = (() => {
+    const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d'), r = rng(31);
+    g.fillStyle = '#6a6a6a'; g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 1500; i++) {
+      const x = r() * S, y = r() * S, l = 5 + r() * 7, a = r() * 6.3, v = 110 + (r() * 145 | 0);
+      for (const [dx, dy] of [[0, 0], [S, 0], [-S, 0], [0, S], [0, -S]]) {         // repetida sin costura
+        if (x + dx < -15 || x + dx > S + 15 || y + dy < -15 || y + dy > S + 15) continue;
+        g.save(); g.translate(x + dx, y + dy); g.rotate(a);
+        g.fillStyle = `rgb(${v},${v},${v})`; g.beginPath(); g.ellipse(0, 0, l, l * .42, 0, 0, 6.3); g.fill();
+        g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.ellipse(-l * .2, -l * .12, l * .5, l * .15, 0, 0, 6.3); g.fill();
+        g.restore();
+      }
+    }
+    // relieve: la claridad hace de altura (las hojas de encima son más claras)
+    const d = g.getImageData(0, 0, S, S).data, nc = document.createElement('canvas'); nc.width = nc.height = S;
+    const ng = nc.getContext('2d'), out = ng.createImageData(S, S), hgt = (x, y) => d[(((y + S) % S) * S + (x + S) % S) * 4] / 255;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const gx = (hgt(x + 1, y) - hgt(x - 1, y)) * 2.5, gy = (hgt(x, y + 1) - hgt(x, y - 1)) * 2.5, l = Math.hypot(gx, gy, 1), k = (y * S + x) * 4;
+      out.data[k] = (-gx / l * .5 + .5) * 255; out.data[k + 1] = (gy / l * .5 + .5) * 255; out.data[k + 2] = (1 / l * .5 + .5) * 255; out.data[k + 3] = 255;
+    }
+    ng.putImageData(out, 0, 0);
+    // gris de 0.42 a 1: se aclara para que el verde de cada material quede igual en promedio
+    g.globalCompositeOperation = 'screen'; g.fillStyle = 'rgba(70,70,70,1)'; g.fillRect(0, 0, S, S);
+    const mk = cv => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 2); t.anisotropy = maxAniso; return t; };
+    return { map: mk(c), n: mk(nc) };
+  })();
+  const leafMats = [0x4c7a3b, 0x5f8c46, 0x3f6a34, 0x6e9a52].map(c => std({ color: c, map: LEAF.map, normalMap: LEAF.n, normalScale: new THREE.Vector2(.9, .9), roughness: .85, flatShading: true }));
+  // Copa deformada: cada vértice sale o entra un poco según su posición (las caras que comparten el vértice siguen pegadas)
+  function leafGeo(rad, seed) {
+    const geo = new THREE.IcosahedronGeometry(rad, 1), p = geo.attributes.position, v = new V3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      const h = Math.sin(v.x * 12.9898 / rad + v.y * 78.233 / rad + v.z * 37.719 / rad + seed * 1.7) * 43758.5453;
+      v.multiplyScalar(1 + ((h - Math.floor(h)) - .5) * .28); p.setXYZ(i, v.x, v.y, v.z);
+    }
+    geo.computeVertexNormals(); return geo;
+  }
+  const T_bark = tex(32, 64, (g, w, h, r) => { g.fillStyle = '#ddd'; g.fillRect(0, 0, w, h); speckle(g, w, h, r, 80, ['rgba(0,0,0,.15)'], [1, 4]); }, 15);
+  T_bark.repeat.set(2, 3);
+  const bark = std({ color: 0x6b5140, map: T_bark, roughness: 1 });
 
   const house = new THREE.Group(); scene.add(house);
   const roof = new THREE.Group(); scene.add(roof);
@@ -1450,7 +1491,7 @@
     const r = rng(seed);
     for (let i = 0, n = Math.max(1, Math.round(len / 0.5)); i < n; i++) {
       const [px, pz] = EP(LEFT.edge + LEFT.bed / 2 + (r() - .5) * 0.22, t0 + len * (i + .5) / n), rad = 0.17 + r() * 0.13;
-      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), leafMats[(r() * 4) | 0]);
+      const m = new THREE.Mesh(leafGeo(rad, rad * 917), leafMats[(r() * 4) | 0]);
       m.position.set(px, top + rad * 0.55, pz); m.scale.y = 0.85; m.castShadow = m.receiveShadow = true; parent.add(m);
     }
   };
@@ -1946,7 +1987,7 @@
         addBox(0.62, 0.24, 0.24, woodD, x, losaY + TECHO.rail - 0.22, z, losaRoof).rotation.y = yaw;
         for (let k = 0; k < 6; k++) {
           const rad = 0.09 + r() * 0.07, [px, pz] = at(d + (r() - .5) * 0.55, -0.13 + (r() - .5) * 0.14);
-          const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), leafMats[(r() * 4) | 0]);
+          const m = new THREE.Mesh(leafGeo(rad, rad * 917), leafMats[(r() * 4) | 0]);
           m.position.set(px, losaY + TECHO.rail - 0.3 - r() * 0.55, pz); m.scale.y = 1.7;
           m.castShadow = true; losaRoof.add(m);
         }
@@ -2003,7 +2044,7 @@
     trunk.position.y = th / 2; trunk.castShadow = true; g.add(trunk);
     const n = 3 + (r() * 2 | 0);
     for (let i = 0; i < n; i++) {
-      const rad = (.7 + r() * .6) * sc, m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), leafMats[(r() * 4) | 0]);
+      const rad = (.7 + r() * .6) * sc, m = new THREE.Mesh(leafGeo(rad, rad * 917), leafMats[(r() * 4) | 0]);
       m.position.set((r() - .5) * 1.1 * sc, th + rad * .6 + i * .45 * sc, (r() - .5) * 1.1 * sc);
       m.rotation.set(r() * 3, r() * 3, r() * 3); m.castShadow = m.receiveShadow = true; g.add(m);
     }
@@ -2013,7 +2054,7 @@
    [16.6, -9.5, 1.5], [-13, -11, 1.2], [-13, 9, 1.1], [-7, 30, 1.2], [8, 26, 1.3], [21, 21, 1.1]]
     .forEach(([x, z, sc], i) => tree(x, z, sc, 20 + i));
   const bush = (x, z, rad, i) => {
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 1), leafMats[i % 4]);
+    const m = new THREE.Mesh(leafGeo(rad, i), leafMats[i % 4]);
     m.position.set(x, groundY(x, z) + rad * 0.5, z); m.scale.y = 0.8; m.castShadow = m.receiveShadow = true; site.add(m);
     WOBST.push([x, z, rad * 0.85]);
   };
@@ -2302,7 +2343,7 @@
   const PHOTO = [
     [T_plaster, 'plaster', .35], [T_concrete, 'concrete', .6], [T_tile, 'tile', .5], [T_block, 'block', .9],
     [T_slab, 'slab', .7], [T_asphalt, 'asphalt', .6], [T_gravel, 'gravel', .8], [T_earth, 'earth', .7],
-    [T_grass, 'grass', .55], [T_stone, 'stone', 1], [T_door, 'door', .8], [T_soffit, 'soffit', .6], [T_wood, 'wood', .5],
+    [T_grass, 'grass', .55], [T_stone, 'stone', 1], [T_door, 'door', .8], [T_soffit, 'soffit', .6], [T_wood, 'wood', .5], [T_bark, 'bark', 1],
   ].map(([t, name, k]) => ({ t, name, k, n: flatN() }));
   const photoOf = new Map(PHOTO.map(p => [p.t, p]));
   // Relieve de la lámina ondulada: sale de la misma onda (coseno) que el sombreado de T_roof, sin descargar nada
