@@ -698,6 +698,9 @@
     g.fillStyle = 'rgba(20,10,5,.5)'; for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 1.5, h);
   }, 10);
 
+  // Veta de madera para los marcos de cedro: casi blanca, el color lo pone el material (la foto llega después, ver PHOTO)
+  const T_wood = tex(64, 64, (g, w, h, r) => { g.fillStyle = '#eee'; g.fillRect(0, 0, w, h); speckle(g, w, h, r, 120, ['rgba(0,0,0,.05)'], [1, 3]); }, 14);
+
   /* ---------- materiales ---------- */
   const std = o => new THREE.MeshStandardMaterial(o);
   const M = {
@@ -713,7 +716,7 @@
     frosted: std({ color: 0xdfe6e8, roughness: .3, transparent: true, opacity: .82, emissive: 0xffd9a3, emissiveIntensity: 0 }),
     clearGlass: std({ color: 0xcfe3ea, roughness: .05, transparent: true, opacity: .25 }),
     door: std({ map: T_door, roughness: .6 }),
-    cedar: std({ color: 0xA8743F, roughness: .65 }),
+    cedar: std({ color: 0xA8743F, map: T_wood, roughness: .65 }),
     brass: std({ color: 0xC9A45C, roughness: .3, metalness: .6 }),
     stone: std({ map: T_stone, roughness: .95 }),
     roof: std({ map: T_roof, roughness: .5, metalness: .1, side: THREE.DoubleSide }),
@@ -2286,6 +2289,51 @@
       const mesh = new THREE.Mesh(geo, b.mat);
       mesh.castShadow = b.cast; mesh.receiveShadow = b.recv; mesh.renderOrder = b.order; root.add(mesh);
     });
+  }
+  /* ---------- texturas fotográficas (2026-11-19) ----------
+     Las texturas dibujadas arriba con canvas salen al instante; apenas se descargan las fotos de tex/ se les cambia la imagen
+     (fotos CC0 de Poly Haven, procesadas a 512 px: el color promedio se igualó al de cada material para no cambiar los colores
+     de la casa, solo el detalle). Cada una trae su mapa de relieve (_n, normal map). El relieve se asigna ya, antes de juntar
+     las piezas y antes del primer cuadro, con un mapa plano de reemplazo: así, cuando llega la foto no hay que recompilar
+     ningún material y no se nota ningún tirón */
+  const flatN = () => tex(4, 4, g => { g.fillStyle = '#8080ff'; g.fillRect(0, 0, 4, 4); });
+  const PHOTO = [
+    [T_plaster, 'plaster', .35], [T_concrete, 'concrete', .6], [T_tile, 'tile', .5], [T_block, 'block', .9],
+    [T_slab, 'slab', .7], [T_asphalt, 'asphalt', .6], [T_gravel, 'gravel', .8], [T_earth, 'earth', .7],
+    [T_grass, 'grass', .55], [T_stone, 'stone', 1], [T_door, 'door', .8], [T_soffit, 'soffit', .6], [T_wood, 'wood', .5],
+  ].map(([t, name, k]) => ({ t, name, k, n: flatN() }));
+  const photoOf = new Map(PHOTO.map(p => [p.t, p]));
+  // Revoque y concreto en cajas: la textura iba una vez por cara, estirada; ahora se repite cada WORLD_UV metros en las caras
+  // que llevan ese material (las demás caras de la caja, como la puerta, quedan igual)
+  const WORLD_UV = new Map([[T_plaster, 2], [T_concrete, 2], [T_wood, 1]]);
+  const BOX_FACE = [[2, 1], [2, 1], [0, 2], [0, 2], [0, 1], [0, 1]];   // ejes (ancho 0, alto 1, fondo 2) de u y v en cada cara
+  {
+    const sc = new V3(), wp = new V3(), done = new Set();
+    BAKE_ROOTS.forEach(r => r.updateMatrixWorld(true));
+    scene.traverse(o => {
+      if (!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => {
+        const p = m && m.map && photoOf.get(m.map);
+        if (p && !m.normalMap && !done.has(m)) { m.normalMap = p.n; m.normalScale.set(p.k, p.k); done.add(m); }
+      });
+      const g = o.geometry;
+      if (!g || g.type !== 'BoxGeometry' || g.attributes.uv.count !== 24 || g.userData.worldUV) return;
+      const faces = Array.isArray(o.material) ? g.groups.map(q => o.material[q.materialIndex]) : Array(6).fill(o.material);
+      if (!faces.some(m => m && WORLD_UV.has(m.map))) return;
+      o.matrixWorld.decompose(wp, new THREE.Quaternion(), sc);
+      const { width, height, depth } = g.parameters, dim = [width * Math.abs(sc.x), height * Math.abs(sc.y), depth * Math.abs(sc.z)];
+      const uv = g.attributes.uv;
+      faces.forEach((m, f) => {
+        const size = m && WORLD_UV.get(m.map); if (!size) return;
+        const [a, b] = BOX_FACE[f], ou = (wp.x + wp.z) / size, ov = wp.y / size;
+        for (let i = f * 4; i < f * 4 + 4; i++) uv.setXY(i, uv.getX(i) * dim[a] / size + ou, uv.getY(i) * dim[b] / size + ov);
+      });
+      uv.needsUpdate = true; g.userData.worldUV = true;
+    });
+    const loader = new THREE.ImageLoader();
+    const swap = (t, file) => loader.load('tex/' + file + '.jpg', img => { t.image = img; t.needsUpdate = true; renderer.initTexture(t); reshadow(); });
+    PHOTO.forEach(p => { swap(p.t, p.name); swap(p.n, p.name + '_n'); });
   }
   BAKE_ROOTS.forEach(bake);
 
