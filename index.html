@@ -2063,6 +2063,7 @@
     if (h < 11.5) return 'mañana'; if (h < 13.5) return 'mediodía'; if (h < 17.25) return 'tarde'; return 'atardecer';
   }
   let lastHour = 10, rainK = 0;                               // rainK: cuánto llueve (juego), de 0 a 1
+  const ENV_MATS = [];                                        // [material, reflejo de día]: el reflejo del cielo baja de noche (ver PHOTO)
   const rainTop = new THREE.Color(0x7D8891), rainBot = new THREE.Color(0xA3ACB2);
   function applyHour(h) {
     const t = (h - 6) / 12 * Math.PI, s = Math.sin(t);
@@ -2085,6 +2086,7 @@
     M.frosted.emissiveIntensity = night * 0.8;
     nbGlass.emissiveIntensity = night * 0.55;
     M.bulb.emissiveIntensity = night * 1.6;
+    ENV_MATS.forEach(([m, k]) => { m.envMapIntensity = k * (0.08 + 0.92 * day) * (1 - 0.5 * rainK); });
     // Cada luz sigue la hora, salvo que en el juego la hayan prendido o apagado en su apagador (userData.on)
     roomLights.forEach(L => {
       const k = L.userData.on == null ? night : L.userData.on ? 1 : 0;
@@ -2303,6 +2305,33 @@
     [T_grass, 'grass', .55], [T_stone, 'stone', 1], [T_door, 'door', .8], [T_soffit, 'soffit', .6], [T_wood, 'wood', .5],
   ].map(([t, name, k]) => ({ t, name, k, n: flatN() }));
   const photoOf = new Map(PHOTO.map(p => [p.t, p]));
+  // Relieve de la lámina ondulada: sale de la misma onda (coseno) que el sombreado de T_roof, sin descargar nada
+  photoOf.set(T_roof, { k: .7, n: tex(128, 4, (g, w, h) => {
+    for (let x = 0; x < w; x++) {
+      const s = -Math.sin(x / w * Math.PI * 2) * 0.55, l = Math.hypot(s, 1);
+      g.fillStyle = `rgb(${Math.round((s / l * .5 + .5) * 255)},128,${Math.round((1 / l * .5 + .5) * 255)})`; g.fillRect(x, 0, 1, h);
+    }
+  }) });
+  /* Reflejo del cielo (2026-11-19): vidrios, aluminio, espejo, zinc y cerámica reflejaban negro, porque no había nada que
+     reflejar, y por eso se veían planos. Se arma una sola vez un cielo de día simple (azul arriba, tierra abajo) en un mapa
+     de entorno chico; su intensidad sigue la hora (ENV_MATS en applyHour). Se asigna antes del primer cuadro: no recompila */
+  const envMap = (() => {
+    // Colores por vértice con MeshBasicMaterial (no ShaderMaterial): el mapa de r128 se guarda en RGBE y un ShaderMaterial
+    // escribe el color sin codificar, lo que deja el reflejo blanco
+    const es = new THREE.Scene(), sg = new THREE.SphereGeometry(10, 32, 16), p = sg.attributes.position, col = [];
+    const sky0 = new THREE.Color(.86, .9, .93), sky1 = new THREE.Color(.5, .66, .82), gr0 = new THREE.Color(.55, .5, .42), gr1 = new THREE.Color(.32, .36, .24), c = new THREE.Color();
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i) / 10;
+      if (y > 0) c.copy(sky0).lerp(sky1, Math.pow(y, .6)); else c.copy(gr0).lerp(gr1, Math.min(1, -y * 3));
+      col.push(c.r, c.g, c.b);
+    }
+    sg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    es.add(new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+    const pm = new THREE.PMREMGenerator(renderer), rt = pm.fromScene(es, 0.02);
+    pm.dispose(); return rt.texture;
+  })();
+  const isRoofMat = m => m.map === T_roof;
+  const ENV_K = new Map([[M.glass, 1], [M.clearGlass, 1], [M.frosted, .5], [M.alu, .8], [M.mirror, 1.2], [M.cap, .7], [M.brass, .9], [M.trim, .25]]);
   // Revoque y concreto en cajas: la textura iba una vez por cara, estirada; ahora se repite cada WORLD_UV metros en las caras
   // que llevan ese material (las demás caras de la caja, como la puerta, quedan igual)
   const WORLD_UV = new Map([[T_plaster, 2], [T_concrete, 2], [T_wood, 1]]);
@@ -2315,7 +2344,11 @@
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       mats.forEach(m => {
         const p = m && m.map && photoOf.get(m.map);
-        if (p && !m.normalMap && !done.has(m)) { m.normalMap = p.n; m.normalScale.set(p.k, p.k); done.add(m); }
+        if (!m || done.has(m)) return;
+        if (p && !m.normalMap) { m.normalMap = p.n; m.normalScale.set(p.k, p.k); }
+        const k = ENV_K.get(m) || (isRoofMat(m) ? .15 : m.map === T_tile ? .35 : 0);
+        if (k && m.isMeshStandardMaterial && !m.envMap) { m.envMap = envMap; ENV_MATS.push([m, k]); }
+        done.add(m);
       });
       const g = o.geometry;
       if (!g || g.type !== 'BoxGeometry' || g.attributes.uv.count !== 24 || g.userData.worldUV) return;
